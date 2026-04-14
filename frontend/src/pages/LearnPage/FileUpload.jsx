@@ -148,7 +148,6 @@ const UploadIcon = () => (
 function FileUpload({ onUploadFiles, onUploadYoutube, isUploading }) {
   const [isDragging, setIsDragging] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  const inputRef = useRef(null);
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
@@ -170,18 +169,10 @@ function FileUpload({ onUploadFiles, onUploadYoutube, isUploading }) {
     [onUploadFiles]
   );
 
+  // Click opens native OS file dialog via Python bridge
   const handleClick = useCallback(() => {
-    inputRef.current?.click();
-  }, []);
-
-  const handleFileChange = useCallback(
-    (e) => {
-      const files = Array.from(e.target.files);
-      if (files.length > 0) onUploadFiles(files);
-      e.target.value = '';
-    },
-    [onUploadFiles]
-  );
+    onUploadFiles(null);
+  }, [onUploadFiles]);
 
   const handleYoutubeSubmit = useCallback(
     (e) => {
@@ -206,13 +197,6 @@ function FileUpload({ onUploadFiles, onUploadYoutube, isUploading }) {
         <UploadIcon />
         <DropText>Drop files here or click to select</DropText>
         <DropSubText>PDF, Markdown, and plain text files</DropSubText>
-        <HiddenInput
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".pdf,.md,.markdown,.txt,.text"
-          onChange={handleFileChange}
-        />
       </DropZone>
 
       <Divider>or</Divider>
