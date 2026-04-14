@@ -1,18 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import styled from 'styled-components';
-
-function formatRelativeTime(dateStr) {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diff = Math.floor((now - date) / 1000);
-
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
+import { formatRelativeDate } from '../../utils/formatDate';
 
 const Sidebar = styled.aside`
   width: 280px;
@@ -218,7 +206,7 @@ function ChatSidebar({
   const handleCollectionChange = useCallback(
     (e) => {
       const val = e.target.value;
-      onCollectionFilter(val === '' ? null : val);
+      onCollectionFilter(val === '' ? null : parseInt(val, 10));
     },
     [onCollectionFilter]
   );
@@ -270,7 +258,7 @@ function ChatSidebar({
                     {session.title || 'Untitled Chat'}
                   </SessionTitle>
                   <SessionTime>
-                    {formatRelativeTime(session.updated_at || session.created_at)}
+                    {formatRelativeDate(session.updated_at || session.created_at)}
                   </SessionTime>
                 </SessionInfo>
                 <DeleteBtn

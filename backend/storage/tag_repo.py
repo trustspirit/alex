@@ -27,25 +27,25 @@ class TagRepo:
         return self._session.query(Tag).order_by(Tag.name).all()
 
     def delete(self, tag_id: int) -> None:
-        tag = self._session.query(Tag).get(tag_id)
+        tag = self._session.get(Tag, tag_id)
         if tag:
             self._session.delete(tag)
             self._session.commit()
 
     def add_tag_to_document(self, doc_id: int, tag_name: str) -> None:
         tag = self.get_or_create(tag_name)
-        doc = self._session.query(Document).get(doc_id)
+        doc = self._session.get(Document, doc_id)
         if doc and tag not in doc.tags:
             doc.tags.append(tag)
             self._session.commit()
 
     def remove_tag_from_document(self, doc_id: int, tag_id: int) -> None:
-        doc = self._session.query(Document).get(doc_id)
-        tag = self._session.query(Tag).get(tag_id)
+        doc = self._session.get(Document, doc_id)
+        tag = self._session.get(Tag, tag_id)
         if doc and tag and tag in doc.tags:
             doc.tags.remove(tag)
             self._session.commit()
 
     def get_tags_for_document(self, doc_id: int) -> list[Tag]:
-        doc = self._session.query(Document).get(doc_id)
+        doc = self._session.get(Document, doc_id)
         return list(doc.tags) if doc else []

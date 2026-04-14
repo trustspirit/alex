@@ -75,6 +75,7 @@ function LearnPage() {
     createCollection,
     renameCollection,
     deleteCollection,
+    refreshDocuments,
   } = useLearn();
 
   return (

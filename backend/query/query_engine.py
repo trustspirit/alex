@@ -105,20 +105,26 @@ class QueryEngine:
         }
 
     def _query_full_context(self, question: str, collection_id: int | None) -> dict:
-        """Send all documents to LLM as context.
+        """Full-context mode: retrieve as much context as possible."""
+        try:
+            # Get a query engine with high top_k to approximate full context
+            if self._index_manager._vector_index:
+                engine = self._index_manager._vector_index.as_query_engine(
+                    llm=self._index_manager._llm,
+                    similarity_top_k=50,  # Retrieve many chunks for small collections
+                )
+            else:
+                engine = self._index_manager.get_query_engine()
 
-        Uses a high similarity_top_k to retrieve as much content as possible
-        from the index, approximating full-context for small collections.
-        """
-        engine = self._index_manager.get_query_engine()
+            response = with_retry(lambda: engine.query(question))
 
-        # For full-context mode, use high similarity_top_k to retrieve everything
-        response = with_retry(lambda: engine.query(question))
-
-        sources = self._source_tracker.extract(response)
-        return {
-            "answer": response.response,
-            "sources": sources,
-            "sources_json": self._source_tracker.to_json(sources),
-            "mode": "full_context",
-        }
+            sources = self._source_tracker.extract(response)
+            return {
+                "answer": response.response,
+                "sources": sources,
+                "sources_json": self._source_tracker.to_json(sources),
+                "mode": "full_context",
+            }
+        except Exception:
+            # fallback to normal RAG
+            return self._query_rag(question, "full_context")

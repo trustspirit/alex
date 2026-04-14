@@ -1,36 +1,12 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 
+from backend.ingestion.loaders.base import LoadResult
+from backend.ingestion.loaders.document import Document
+
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Optional imports – wrap in try/except so missing libraries don't crash
-# at import time.  Imported at module level so tests can patch them.
-# ---------------------------------------------------------------------------
-
-try:
-    from llama_index.core import Document
-except Exception:
-    # Minimal stand-in when llama_index is not installed
-    class Document:  # type: ignore[no-redef]
-        def __init__(self, text: str = "", metadata: dict | None = None) -> None:
-            self.text = text
-            self.metadata: dict = metadata or {}
-
-
-# ---------------------------------------------------------------------------
-# LoadResult
-# ---------------------------------------------------------------------------
-
-@dataclass
-class LoadResult:
-    documents: list
-    fallback_used: bool = False
-    fallback_warning: str | None = None
-    has_structure: bool = False  # Plain text is unstructured
 
 
 # ---------------------------------------------------------------------------

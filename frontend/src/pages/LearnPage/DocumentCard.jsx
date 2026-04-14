@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
-import styled, { keyframes, css } from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { useBridge } from '../../hooks/useBridge';
+import { formatRelativeDate } from '../../utils/formatDate';
 
 const progressAnim = keyframes`
   from { opacity: 0.6; }
@@ -233,22 +234,6 @@ const WarnTriangle = () => (
     <circle cx="8" cy="11.5" r="0.5" fill="#D97706" stroke="none" />
   </svg>
 );
-
-function formatRelativeDate(dateStr) {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 60) return 'just now';
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 30) return `${diffDay}d ago`;
-  return date.toLocaleDateString();
-}
 
 function DocumentCard({ doc, docProgress, docWarnings, onDelete, onReindex, onTagsChanged }) {
   const { call } = useBridge();

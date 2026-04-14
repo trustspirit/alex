@@ -3,8 +3,10 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
-from dataclasses import dataclass, field
 from urllib.parse import parse_qs, urlparse
+
+from backend.ingestion.loaders.base import LoadResult
+from backend.ingestion.loaders.document import Document
 
 logger = logging.getLogger(__name__)
 
@@ -27,27 +29,6 @@ try:
     import openai
 except Exception:
     openai = None  # type: ignore[assignment]
-
-try:
-    from llama_index.core import Document
-except Exception:
-    # Minimal stand-in when llama_index is not installed
-    class Document:  # type: ignore[no-redef]
-        def __init__(self, text: str = "", metadata: dict | None = None) -> None:
-            self.text = text
-            self.metadata: dict = metadata or {}
-
-
-# ---------------------------------------------------------------------------
-# LoadResult
-# ---------------------------------------------------------------------------
-
-@dataclass
-class LoadResult:
-    documents: list
-    fallback_used: bool = False
-    fallback_warning: str | None = None
-    has_structure: bool = False  # YouTube transcripts are unstructured
 
 
 # ---------------------------------------------------------------------------

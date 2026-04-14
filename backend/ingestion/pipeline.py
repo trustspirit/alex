@@ -84,7 +84,7 @@ class IngestionPipeline:
             token_count = metadata.get("token_count", 0)
 
             # Update title and token_count on doc
-            doc.title = title
+            self._doc_repo.update_title(doc_id, title)
             self._doc_repo.set_token_count(doc_id, token_count)
 
             # Step 6: Chunking

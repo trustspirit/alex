@@ -210,10 +210,6 @@ export function useChat() {
         e.preventDefault();
         createNewSession();
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        // Future: focus search
-      }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);

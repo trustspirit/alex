@@ -224,7 +224,7 @@ function ModelSelector({
       {embedChanged && (
         <EmbedWarning>
           <WarningText>
-            Changing the embedding model requires re-indexing all documents. This may take a while.
+            App restart required. Changing the embedding model requires re-indexing all documents. This may take a while.
           </WarningText>
           <ReindexButton onClick={handleReindexAll} disabled={reindexing}>
             {reindexing ? 'Re-indexing...' : 'Re-index All'}

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+
+from backend.ingestion.loaders.base import LoadResult
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +20,6 @@ try:
     from liteparse import LiteParser
 except Exception:
     LiteParser = None  # type: ignore[assignment,misc]
-
-
-# ---------------------------------------------------------------------------
-# LoadResult
-# ---------------------------------------------------------------------------
-
-@dataclass
-class LoadResult:
-    documents: list
-    fallback_used: bool = False
-    fallback_warning: str | None = None
-    has_structure: bool = True  # True if PDF has headings/structure
 
 
 # ---------------------------------------------------------------------------

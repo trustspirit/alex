@@ -354,20 +354,20 @@ class BridgeAPI:
     # Tag API
     # ------------------------------------------------------------------
 
-    def get_tags(self):
+    def get_tags(self) -> list[dict]:
         """Return all tags as JSON-serialisable dicts."""
         if not self._tag_repo:
             return []
         tags = self._tag_repo.list_all()
         return [{"id": t.id, "name": t.name} for t in tags]
 
-    def add_tag_to_document(self, doc_id, tag_name):
+    def add_tag_to_document(self, doc_id: int, tag_name: str) -> dict:
         """Add a tag to a document (creates the tag if needed)."""
         if self._tag_repo:
             self._tag_repo.add_tag_to_document(doc_id, tag_name)
         return {"success": True}
 
-    def remove_tag_from_document(self, doc_id, tag_id):
+    def remove_tag_from_document(self, doc_id: int, tag_id: int) -> dict:
         """Remove a tag from a document."""
         if self._tag_repo:
             self._tag_repo.remove_tag_from_document(doc_id, tag_id)
@@ -377,7 +377,7 @@ class BridgeAPI:
     # Re-index all
     # ------------------------------------------------------------------
 
-    def reindex_all_documents(self):
+    def reindex_all_documents(self) -> dict:
         """Re-index all completed documents with new embedding model."""
         docs = self._document_repo.list_all()
         count = 0
