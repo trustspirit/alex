@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useBridge } from './useBridge';
 import { useProgress } from './useProgress';
 
@@ -45,6 +45,25 @@ export function useLearn() {
     refreshDocuments();
     refreshCollections();
   }, [refreshDocuments, refreshCollections]);
+
+  // Refresh document list when a processing step changes or completes/fails
+  const progressStepsRef = useRef({});
+  useEffect(() => {
+    let shouldRefresh = false;
+    for (const [docId, p] of Object.entries(progress)) {
+      const prev = progressStepsRef.current[docId];
+      if (!prev || prev.step !== p.step) {
+        shouldRefresh = true;
+      }
+    }
+    progressStepsRef.current = { ...progress };
+    if (shouldRefresh) refreshDocuments();
+  }, [progress, refreshDocuments]);
+
+  // Also refresh when errors arrive (document status changed to failed)
+  useEffect(() => {
+    if (errors.length > 0) refreshDocuments();
+  }, [errors, refreshDocuments]);
 
   // Helper: read a File object as base64 string
   const readFileAsBase64 = (file) =>
