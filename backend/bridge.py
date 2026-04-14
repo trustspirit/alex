@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 
 try:
     import webview
@@ -54,6 +55,23 @@ class BridgeAPI:
                 f"window.__bridge__.{callback_name}({json_data})"
             )
 
+    def _stream_response(
+        self, session_id: int, answer: str, sources: list, mode: str
+    ) -> None:
+        """Push answer text in small chunks for streaming effect."""
+        words = answer.split(' ')
+        for i, word in enumerate(words):
+            token = word if i == 0 else ' ' + word
+            self._push_js("onToken", {"token": token})
+            time.sleep(0.02)
+
+        self._push_js("onQueryComplete", {
+            "session_id": session_id,
+            "answer": answer,
+            "sources": sources,
+            "mode": mode,
+        })
+
     # ------------------------------------------------------------------
     # Chat API
     # ------------------------------------------------------------------
@@ -97,14 +115,11 @@ class BridgeAPI:
                     source_references=sources_json,
                 )
 
-                self._push_js(
-                    "onQueryComplete",
-                    {
-                        "session_id": session_id,
-                        "answer": answer,
-                        "sources": result.get("sources", []),
-                        "mode": result.get("mode", ""),
-                    },
+                self._stream_response(
+                    session_id=session_id,
+                    answer=answer,
+                    sources=result.get("sources", []),
+                    mode=result.get("mode", ""),
                 )
             except Exception as exc:
                 logger.error("ask() background query failed: %s", exc)
