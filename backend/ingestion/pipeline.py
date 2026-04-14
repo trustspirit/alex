@@ -250,13 +250,14 @@ class IngestionPipeline:
             full_text = "\n".join(doc_obj.text for doc_obj in load_result.documents)
             if self._llm:
                 self._summarizer.summarize_document(full_text)
-                if nodes:
-                    self._summarizer.summarize_chunks(nodes)
+                # Skip per-chunk summarization — too many LLM calls for large docs.
+                # The vector index handles retrieval without chunk summaries.
+                logger.info("[doc %s] Document summary generated. Skipping per-chunk summaries (%d nodes).", doc_id, len(nodes))
             else:
                 logger.info("[doc %s] Skipping summarization (no LLM configured)", doc_id)
             logger.info("[doc %s] Summarization done.", doc_id)
 
-            # Generate QA pairs and add as extra nodes
+            # Generate QA pairs (only from first portion of text, single LLM call)
             if self._llm and nodes:
                 try:
                     logger.info("[doc %s] Generating QA pairs...", doc_id)
