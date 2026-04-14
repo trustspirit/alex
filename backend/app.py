@@ -65,6 +65,15 @@ def start_app() -> None:
     tag_repo = TagRepo(ScopedSession)
 
     # ------------------------------------------------------------------
+    # Clean up stale "processing" documents from previous crashed sessions
+    # ------------------------------------------------------------------
+    stale_docs = [d for d in document_repo.list_all() if d.status == "processing"]
+    for d in stale_docs:
+        logger.warning("Resetting stale processing document %s to failed", d.id)
+        document_repo.update_status(d.id, "failed")
+        document_repo.set_fallback(d.id, "Processing was interrupted. Please re-index.")
+
+    # ------------------------------------------------------------------
     # LLM provider manager
     # ------------------------------------------------------------------
     provider_manager = ProviderManager()
