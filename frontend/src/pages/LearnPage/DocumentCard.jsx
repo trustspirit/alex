@@ -235,6 +235,18 @@ const WarnTriangle = () => (
   </svg>
 );
 
+const STEP_LABELS = {
+  extracting: 'Extracting text',
+  chunking: 'Chunking',
+  summarizing: 'Summarizing',
+  indexing: 'Indexing',
+  completed: 'Completing',
+};
+
+function stepLabel(step) {
+  return STEP_LABELS[step] || step;
+}
+
 function DocumentCard({ doc, docProgress, docWarnings, onDelete, onReindex, onTagsChanged }) {
   const { call } = useBridge();
   const status = doc.status || 'pending';
@@ -302,7 +314,11 @@ function DocumentCard({ doc, docProgress, docWarnings, onDelete, onReindex, onTa
 
       <CardMeta>
         <SourceBadge $type={doc.source_type}>{doc.source_type || '—'}</SourceBadge>
-        <StatusText $status={status}>{status}</StatusText>
+        <StatusText $status={status}>
+          {status === 'processing' && docProgress?.step
+            ? `${stepLabel(docProgress.step)} (${pct}%)`
+            : status}
+        </StatusText>
         {doc.created_at && (
           <DateText>{formatRelativeDate(doc.created_at)}</DateText>
         )}

@@ -214,8 +214,11 @@ class IngestionPipeline:
         try:
             self._doc_repo.update_status(doc_id, "processing")
             self._emit_progress(doc_id, "extracting", 10, progress_cb)
+            logger.info("[doc %s] Step 1/5: Extracting text...", doc_id)
 
             load_result = self._load(source_path, source_type)
+            logger.info("[doc %s] Extraction done. %d documents, fallback=%s",
+                        doc_id, len(load_result.documents), load_result.fallback_used)
 
             if load_result.fallback_used:
                 self._doc_repo.set_fallback(doc_id, load_result.fallback_warning)
@@ -224,41 +227,54 @@ class IngestionPipeline:
             metadata = extract_metadata(load_result.documents, source_path, source_type)
             token_count = metadata.get("token_count", 0)
             self._doc_repo.set_token_count(doc_id, token_count)
+            logger.info("[doc %s] Metadata: title=%s tokens=%d", doc_id, metadata.get("title"), token_count)
 
             title = metadata.get("title", "")
             if title:
                 self._doc_repo.update_title(doc_id, title)
 
             self._emit_progress(doc_id, "chunking", 30, progress_cb)
+            logger.info("[doc %s] Step 2/5: Chunking...", doc_id)
             nodes = self._chunker.chunk(
                 load_result.documents,
                 has_structure=load_result.has_structure,
                 embed_model=self._embed_model,
             )
+            logger.info("[doc %s] Chunking done. %d nodes", doc_id, len(nodes))
 
             self._emit_progress(doc_id, "summarizing", 50, progress_cb)
+            logger.info("[doc %s] Step 3/5: Summarizing...", doc_id)
             full_text = "\n".join(doc_obj.text for doc_obj in load_result.documents)
-            self._summarizer.summarize_document(full_text)
-            if nodes:
-                self._summarizer.summarize_chunks(nodes)
+            if self._llm:
+                self._summarizer.summarize_document(full_text)
+                if nodes:
+                    self._summarizer.summarize_chunks(nodes)
+            else:
+                logger.info("[doc %s] Skipping summarization (no LLM configured)", doc_id)
+            logger.info("[doc %s] Summarization done.", doc_id)
 
             # Generate QA pairs and add as extra nodes
             if self._llm and nodes:
                 try:
+                    logger.info("[doc %s] Generating QA pairs...", doc_id)
                     qa_pairs = self._summarizer.generate_qa_pairs(full_text[:4000])
                     for qa in qa_pairs:
                         qa_text = f"Q: {qa['question']}\nA: {qa['answer']}"
                         qa_node = type(nodes[0])(text=qa_text, metadata={"type": "qa_pair", "source": source_path})
                         nodes.append(qa_node)
+                    logger.info("[doc %s] QA pairs added: %d", doc_id, len(qa_pairs))
                 except Exception as exc:
-                    logger.warning("QA pair generation failed: %s", exc)
+                    logger.warning("[doc %s] QA pair generation failed: %s", doc_id, exc)
 
             self._emit_progress(doc_id, "indexing", 70, progress_cb)
+            logger.info("[doc %s] Step 4/5: Indexing %d nodes...", doc_id, len(nodes))
             if nodes:
                 self._index_manager.build_vector_index(nodes)
+            logger.info("[doc %s] Indexing done.", doc_id)
 
             self._emit_progress(doc_id, "completed", 100, progress_cb)
             self._doc_repo.update_status(doc_id, "completed")
+            logger.info("[doc %s] Step 5/5: COMPLETED successfully.", doc_id)
 
         except Exception as exc:
             logger.error("Async ingestion failed for doc %s: %s", doc_id, exc, exc_info=True)
