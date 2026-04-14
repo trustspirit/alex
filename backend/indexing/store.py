@@ -60,6 +60,29 @@ class ChromaStore:
         chroma_collection = self.get_or_create_collection(collection_name)
         return ChromaVectorStore(chroma_collection=chroma_collection)
 
+    def delete_documents_by_source(self, collection_name: str, source_path: str) -> int:
+        """Delete all vectors in a collection whose metadata 'source' matches source_path.
+
+        Returns the number of deleted entries (0 if none found or collection missing).
+        """
+        try:
+            coll = self._client.get_or_create_collection(name=collection_name)
+            # Query for matching documents
+            results = coll.get(where={"source": source_path})
+            if results and results["ids"]:
+                coll.delete(ids=results["ids"])
+                logger.info(
+                    "Deleted %d vectors for source=%s from collection=%s",
+                    len(results["ids"]),
+                    source_path,
+                    collection_name,
+                )
+                return len(results["ids"])
+            return 0
+        except Exception as exc:
+            logger.warning("Failed to delete vectors for source %s: %s", source_path, exc)
+            return 0
+
     def delete_collection(self, name: str) -> None:
         """Delete a collection by name, logging a warning on failure."""
         try:

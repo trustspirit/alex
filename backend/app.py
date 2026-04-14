@@ -180,6 +180,7 @@ def start_app() -> None:
         settings_repo=settings_repo,
         provider_manager=provider_manager,
         tag_repo=tag_repo,
+        chroma_store=chroma_store,
     )
 
     # ------------------------------------------------------------------

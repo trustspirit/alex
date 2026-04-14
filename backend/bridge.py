@@ -30,6 +30,7 @@ class BridgeAPI:
         settings_repo,
         provider_manager,
         tag_repo=None,
+        chroma_store=None,
     ) -> None:
         self._pipeline = pipeline
         self._query_engine = query_engine
@@ -39,6 +40,7 @@ class BridgeAPI:
         self._settings_repo = settings_repo
         self._provider_manager = provider_manager
         self._tag_repo = tag_repo
+        self._chroma_store = chroma_store
         self._window = None  # Set after window creation
 
     def set_window(self, window) -> None:
@@ -237,7 +239,13 @@ class BridgeAPI:
         return result
 
     def delete_document(self, doc_id: int) -> dict:
-        """Delete a document record."""
+        """Delete a document record and its associated vectors from ChromaDB."""
+        doc = self._document_repo.get_by_id(doc_id)
+        if doc and self._chroma_store:
+            try:
+                self._chroma_store.delete_documents_by_source("default", doc.source_path)
+            except Exception as exc:
+                logger.warning("Failed to delete vectors for doc %s: %s", doc_id, exc)
         self._document_repo.delete(doc_id)
         return {"success": True}
 
