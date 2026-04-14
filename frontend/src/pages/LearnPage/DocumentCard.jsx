@@ -3,9 +3,18 @@ import styled, { keyframes } from 'styled-components';
 import { useBridge } from '../../hooks/useBridge';
 import { formatRelativeDate } from '../../utils/formatDate';
 
-const progressAnim = keyframes`
-  from { opacity: 0.6; }
-  to { opacity: 1; }
+const stripeMove = keyframes`
+  0% { background-position: 0 0; }
+  100% { background-position: 30px 0; }
+`;
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+`;
+
+const spin = keyframes`
+  to { transform: rotate(360deg); }
 `;
 
 const Card = styled.div`
@@ -123,11 +132,35 @@ const ProgressTrack = styled.div`
 
 const ProgressFill = styled.div`
   height: 100%;
-  background: ${({ theme }) => theme.colors.primary};
   border-radius: 2px;
-  width: ${({ $pct }) => $pct}%;
-  transition: width 0.3s ease;
-  animation: ${progressAnim} 1s ease-in-out infinite alternate;
+  width: ${({ $pct }) => Math.max($pct, 5)}%;
+  min-width: 20px;
+  transition: width 0.5s ease;
+  background: repeating-linear-gradient(
+    -45deg,
+    ${({ theme }) => theme.colors.primary},
+    ${({ theme }) => theme.colors.primary} 6px,
+    ${({ theme }) => theme.colors.primaryHover} 6px,
+    ${({ theme }) => theme.colors.primaryHover} 12px
+  );
+  background-size: 30px 30px;
+  animation: ${stripeMove} 0.8s linear infinite;
+`;
+
+const MiniSpinner = styled.span`
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid ${({ theme }) => theme.colors.primary};
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: ${spin} 0.6s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+`;
+
+const PulseText = styled.span`
+  animation: ${pulse} 1.5s ease-in-out infinite;
 `;
 
 const WarningIcon = styled.span`
@@ -315,9 +348,16 @@ function DocumentCard({ doc, docProgress, docWarnings, onDelete, onReindex, onTa
       <CardMeta>
         <SourceBadge $type={doc.source_type}>{doc.source_type || '—'}</SourceBadge>
         <StatusText $status={status}>
-          {status === 'processing' && docProgress?.step
-            ? `${stepLabel(docProgress.step)} (${pct}%)`
-            : status}
+          {status === 'processing' ? (
+            <>
+              <MiniSpinner />
+              <PulseText>
+                {docProgress?.step
+                  ? `${stepLabel(docProgress.step)} (${pct}%)`
+                  : 'Starting...'}
+              </PulseText>
+            </>
+          ) : status}
         </StatusText>
         {doc.created_at && (
           <DateText>{formatRelativeDate(doc.created_at)}</DateText>
