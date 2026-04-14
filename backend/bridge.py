@@ -182,6 +182,34 @@ class BridgeAPI:
     # Document API
     # ------------------------------------------------------------------
 
+    def ingest_document_content(
+        self,
+        filename: str,
+        base64_content: str,
+        source_type: str,
+        collection_id: int | None = None,
+    ) -> dict:
+        """Receive file content (base64) from drag & drop, save to temp, then ingest."""
+        import base64
+        import tempfile
+        from pathlib import Path
+
+        logger.info("ingest_document_content called: filename=%s type=%s", filename, source_type)
+        try:
+            # Decode and save to persistent temp location
+            data = base64.b64decode(base64_content)
+            upload_dir = Path.home() / ".alex" / "uploads"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            file_path = upload_dir / filename
+            file_path.write_bytes(data)
+            logger.info("Saved uploaded file to %s (%d bytes)", file_path, len(data))
+
+            return self.ingest_document(str(file_path), source_type, collection_id)
+        except Exception as exc:
+            logger.error("ingest_document_content failed: %s", exc, exc_info=True)
+            self._push_js("onIngestError", {"doc_id": -1, "error": str(exc)})
+            return {"error": str(exc)}
+
     def ingest_document(
         self,
         source_path: str,

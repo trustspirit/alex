@@ -46,37 +46,53 @@ export function useLearn() {
     refreshCollections();
   }, [refreshDocuments, refreshCollections]);
 
+  // Helper: read a File object as base64 string
+  const readFileAsBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        // result is "data:<mime>;base64,<data>" — strip the prefix
+        const base64 = reader.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const uploadFiles = useCallback(
     async (files) => {
-      let filePaths = [];
-
       if (!files) {
         // Click: open native OS file dialog via Python bridge
         const result = await call('open_file_dialog');
         if (!result || result.length === 0) return;
-        filePaths = result.map((p) => ({
-          path: p,
-          name: p.split('/').pop() || p,
-        }));
-      } else {
-        // Drag & drop: use file path if available, fallback to name
-        for (const f of files) {
-          const path = f.path || f.name;
-          filePaths.push({ path, name: f.name });
+
+        setIsUploading(true);
+        try {
+          for (const p of result) {
+            const name = p.split('/').pop() || p;
+            const sourceType = detectSourceType(name);
+            await call('ingest_document', p, sourceType, selectedCollection);
+          }
+          await refreshDocuments();
+        } catch (err) {
+          console.error('[useLearn] uploadFiles (dialog) failed:', err);
+        } finally {
+          setIsUploading(false);
         }
+        return;
       }
 
-      if (filePaths.length === 0) return;
-
+      // Drag & drop: read file contents and send to backend
       setIsUploading(true);
       try {
-        for (const file of filePaths) {
+        for (const file of files) {
           const sourceType = detectSourceType(file.name);
-          await call('ingest_document', file.path, sourceType, selectedCollection);
+          const base64Content = await readFileAsBase64(file);
+          await call('ingest_document_content', file.name, base64Content, sourceType, selectedCollection);
         }
         await refreshDocuments();
       } catch (err) {
-        console.error('[useLearn] uploadFiles failed:', err);
+        console.error('[useLearn] uploadFiles (drop) failed:', err);
       } finally {
         setIsUploading(false);
       }
