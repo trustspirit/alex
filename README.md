@@ -25,7 +25,7 @@ Named after the [Library of Alexandria](https://en.wikipedia.org/wiki/Library_of
 | Desktop | [PyWebView](https://pywebview.flowrl.com/) |
 | Frontend | React + Vite + Styled-components |
 | RAG Framework | [LlamaIndex](https://www.llamaindex.ai/) 0.14+ |
-| PDF Parsing | LlamaParse v2 / OpenDataLoader / LiteParse |
+| PDF Parsing | [LlamaParse v2](https://cloud.llamaindex.ai) (llama-cloud SDK) / OpenDataLoader / LiteParse |
 | Vector DB | [ChromaDB](https://www.trychroma.com/) |
 | Metadata DB | SQLite (via SQLAlchemy) |
 | LLM Providers | OpenAI, Anthropic, Google Gemini |
@@ -98,7 +98,10 @@ python run.py
 
 ### First Launch
 
-1. Go to **Settings** and enter your API key(s)
+1. Go to **Settings** and enter your API key(s):
+   - **OpenAI** (required) — for embeddings and optionally chat
+   - **Anthropic** or **Gemini** — for chat (at least one LLM provider needed)
+   - **LlamaParse** (recommended) — for high-quality PDF parsing. Free key at [cloud.llamaindex.ai](https://cloud.llamaindex.ai) (1,000 pages/day)
 2. Select a default LLM model
 3. Go to **Learn** and upload a document or paste a YouTube URL
 4. Go to **Chat** and start asking questions
