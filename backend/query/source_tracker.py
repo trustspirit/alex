@@ -40,6 +40,11 @@ class SourceTracker:
                 or metadata.get("page")
                 or metadata.get("page_number")
             )
+            # Include a text preview (first 300 chars)
+            text = getattr(node_with_score.node, "text", "") or ""
+            preview = text[:300].strip()
+            if len(text) > 300:
+                preview += "..."
 
             raw.append(
                 {
@@ -48,18 +53,42 @@ class SourceTracker:
                     "page": page,
                     "score": node_with_score.score,
                     "fallback": bool(metadata.get("fallback", False)),
+                    "preview": preview,
                 }
             )
 
-        # Deduplicate by (source, page) — keep highest score
-        seen: dict[tuple, dict] = {}
+        # Group by source file, collect unique pages with best scores
+        grouped: dict[str, dict] = {}
         for s in raw:
-            key = (s["source"], s["page"])
-            if key not in seen or (s["score"] or 0) > (seen[key]["score"] or 0):
-                seen[key] = s
+            src = s["source"]
+            if src not in grouped:
+                grouped[src] = {
+                    "source": src,
+                    "type": s["type"],
+                    "fallback": s["fallback"],
+                    "pages": [],
+                }
+            # Add page if not already present
+            page_entry = {"page": s["page"], "score": s["score"], "preview": s["preview"]}
+            existing_pages = [p["page"] for p in grouped[src]["pages"]]
+            if s["page"] not in existing_pages:
+                grouped[src]["pages"].append(page_entry)
+            else:
+                # Keep higher score for same page
+                for p in grouped[src]["pages"]:
+                    if p["page"] == s["page"] and (s["score"] or 0) > (p["score"] or 0):
+                        p["score"] = s["score"]
+                        p["preview"] = s["preview"]
 
-        sources = list(seen.values())
-        logger.debug("Extracted %d sources (%d after dedup).", len(raw), len(sources))
+        # Sort pages by score desc within each group
+        sources = []
+        for g in grouped.values():
+            g["pages"].sort(key=lambda p: p["score"] or 0, reverse=True)
+            g["best_score"] = g["pages"][0]["score"] if g["pages"] else None
+            sources.append(g)
+
+        sources.sort(key=lambda s: s["best_score"] or 0, reverse=True)
+        logger.debug("Extracted %d raw sources → %d grouped sources.", len(raw), len(sources))
         return sources
 
     def format_for_display(self, sources: list[dict]) -> list[dict]:

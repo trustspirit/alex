@@ -1,57 +1,100 @@
+import { useState } from 'react';
 import styled from 'styled-components';
 
 const Card = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 10px;
-  background: ${({ theme }) => theme.colors.bg};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.md};
+  overflow: hidden;
   font-size: ${({ theme }) => theme.fontSizes.xs};
-  line-height: 1.4;
 `;
 
-const SourceIcon = styled.div`
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+const FileHeader = styled.div`
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: ${({ theme }) => theme.colors.bg};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.borderLight};
+`;
+
+const FileIcon = styled.span`
   color: ${({ $hasWarning, theme }) =>
     $hasWarning ? theme.colors.warning : theme.colors.textTertiary};
-  margin-top: 1px;
+  display: flex;
+  align-items: center;
 `;
 
-const SourceBody = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const SourceName = styled.div`
-  color: ${({ theme }) => theme.colors.text};
+const FileName = styled.span`
   font-weight: 500;
+  color: ${({ theme }) => theme.colors.text};
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 `;
 
-const SourceMeta = styled.div`
-  color: ${({ theme }) => theme.colors.textTertiary};
-  margin-top: 2px;
+const WarningBadge = styled.span`
+  color: ${({ theme }) => theme.colors.warning};
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+`;
+
+const PageList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+`;
+
+const PageItem = styled.div`
+  position: relative;
+  padding: 6px 10px;
+  cursor: default;
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.borderLight};
+  transition: background 0.1s;
+  width: 100%;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.surfaceHover};
+  }
 `;
 
-const WarningBadge = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: ${({ theme }) => theme.colors.warning};
-  font-size: 10px;
+const PageLabel = styled.span`
+  font-weight: 500;
+  color: ${({ theme }) => theme.colors.primary};
+  min-width: 40px;
+`;
+
+const ScoreText = styled.span`
+  color: ${({ theme }) => theme.colors.textTertiary};
+`;
+
+const PreviewToggle = styled.span`
+  color: ${({ theme }) => theme.colors.textTertiary};
+  margin-left: auto;
+  cursor: pointer;
+  &:hover {
+    color: ${({ theme }) => theme.colors.text};
+  }
+`;
+
+const PreviewBox = styled.div`
+  padding: 8px 10px;
+  background: ${({ theme }) => theme.colors.bg};
+  border-top: 1px solid ${({ theme }) => theme.colors.borderLight};
+  font-size: 12px;
+  line-height: 1.5;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  white-space: pre-wrap;
+  max-height: 150px;
+  overflow-y: auto;
 `;
 
 const DocIcon = () => (
@@ -59,7 +102,6 @@ const DocIcon = () => (
     <path d="M2 1h6l2 2v10H2V1z" />
     <line x1="4" y1="5" x2="8" y2="5" />
     <line x1="4" y1="7.5" x2="8" y2="7.5" />
-    <line x1="4" y1="10" x2="6" y2="10" />
   </svg>
 );
 
@@ -67,7 +109,6 @@ const WarnIcon = () => (
   <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M5 1L9 9H1L5 1z" />
     <line x1="5" y1="4.5" x2="5" y2="6.5" />
-    <circle cx="5" cy="7.8" r="0.3" fill="currentColor" />
   </svg>
 );
 
@@ -80,29 +121,46 @@ function getDisplayName(source) {
 }
 
 function SourceCard({ source }) {
-  const { page, score, fallback } = source;
+  const [expandedPage, setExpandedPage] = useState(null);
   const displayName = getDisplayName(source);
-  const hasWarning = Boolean(fallback);
-  const scoreDisplay = typeof score === 'number' ? `${(score * 100).toFixed(0)}%` : null;
+  const hasWarning = Boolean(source.fallback);
+  const pages = source.pages || [];
 
   return (
     <Card>
-      <SourceIcon $hasWarning={hasWarning}>
-        <DocIcon />
-      </SourceIcon>
-      <SourceBody>
-        <SourceName title={displayName}>{displayName}</SourceName>
-        <SourceMeta>
-          {page != null && <span>p. {page}</span>}
-          {scoreDisplay && <span>Relevance {scoreDisplay}</span>}
-          {hasWarning && (
-            <WarningBadge title="Parsed with fallback method">
-              <WarnIcon />
-              Fallback
-            </WarningBadge>
-          )}
-        </SourceMeta>
-      </SourceBody>
+      <FileHeader>
+        <FileIcon $hasWarning={hasWarning}>
+          <DocIcon />
+        </FileIcon>
+        <FileName title={source.source}>{displayName}</FileName>
+        {hasWarning && (
+          <WarningBadge title="Parsed with fallback method">
+            <WarnIcon /> Fallback
+          </WarningBadge>
+        )}
+      </FileHeader>
+
+      <PageList>
+        {pages.map((p, idx) => {
+          const scoreDisplay = typeof p.score === 'number' ? `${(p.score * 100).toFixed(0)}%` : null;
+          const isExpanded = expandedPage === idx;
+
+          return (
+            <div key={idx}>
+              <PageItem
+                onClick={() => setExpandedPage(isExpanded ? null : idx)}
+              >
+                {p.page != null && <PageLabel>p. {p.page}</PageLabel>}
+                {scoreDisplay && <ScoreText>Relevance {scoreDisplay}</ScoreText>}
+                <PreviewToggle>{isExpanded ? '▲' : '▼'}</PreviewToggle>
+              </PageItem>
+              {isExpanded && p.preview && (
+                <PreviewBox>{p.preview}</PreviewBox>
+              )}
+            </div>
+          );
+        })}
+      </PageList>
     </Card>
   );
 }

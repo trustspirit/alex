@@ -25,6 +25,7 @@ def _make_node_with_score(
         node.node.metadata["page"] = page
     node.score = score
     node.node.metadata["fallback"] = fallback
+    node.node.text = f"Sample text from {source} page {page}"
     return node
 
 
@@ -32,7 +33,7 @@ class TestSourceTrackerExtract:
     """Tests for SourceTracker.extract()."""
 
     def test_extract_two_nodes(self):
-        """extract() returns one dict per source_node."""
+        """extract() groups by source file, each with page entries."""
         tracker = SourceTracker()
 
         pdf_node = _make_node_with_score(
@@ -47,17 +48,18 @@ class TestSourceTrackerExtract:
 
         sources = tracker.extract(mock_response)
 
+        # Grouped by source → 2 groups
         assert len(sources) == 2
+        # Sorted by best_score desc → pdf first
         assert sources[0]["source"] == "/docs/paper.pdf"
         assert sources[0]["type"] == "pdf"
-        assert sources[0]["page"] == 5
-        assert sources[0]["score"] == 0.95
-        assert sources[0]["fallback"] is False
+        assert len(sources[0]["pages"]) == 1
+        assert sources[0]["pages"][0]["page"] == 5
+        assert sources[0]["pages"][0]["score"] == 0.95
 
         assert sources[1]["source"] == "https://youtu.be/abc123"
-        assert sources[1]["type"] == "youtube"
-        assert sources[1]["page"] is None
-        assert sources[1]["score"] == 0.78
+        assert sources[1]["pages"][0]["page"] is None
+        assert sources[1]["pages"][0]["score"] == 0.78
 
     def test_extract_empty_source_nodes(self):
         """extract() returns empty list when there are no source nodes."""
