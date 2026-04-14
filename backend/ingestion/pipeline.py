@@ -220,6 +220,9 @@ class IngestionPipeline:
             logger.info("[doc %s] Extraction done. %d documents, fallback=%s",
                         doc_id, len(load_result.documents), load_result.fallback_used)
 
+            if not load_result.documents:
+                raise RuntimeError("No text could be extracted from the document. The file may be image-only or corrupted.")
+
             if load_result.fallback_used:
                 self._doc_repo.set_fallback(doc_id, load_result.fallback_warning)
                 self._emit_warning(doc_id, load_result.fallback_warning, warning_cb)

@@ -150,7 +150,10 @@ class PdfLoader:
             result_type="markdown",
             skip_diagonal_text=True,
         )
-        return parser.load_data(file_path)
+        docs = parser.load_data(file_path)
+        if not docs:
+            raise RuntimeError("LlamaParse returned empty result")
+        return docs
 
     def _load_liteparse(self, file_path: str) -> list:
         if _LiteParse is None:
@@ -162,14 +165,18 @@ class PdfLoader:
         documents = []
         for page in range(result.num_pages):
             parsed_page = result.get_page(page)
-            if parsed_page.text.strip():
-                documents.append(Document(
-                    text=parsed_page.text,
-                    metadata={
-                        "source": file_path,
-                        "type": "pdf",
-                        "method": "liteparse",
-                        "page_label": str(page + 1),
+            if parsed_page is None:
+                continue
+            text = parsed_page.text or ""
+            if not text.strip():
+                continue
+            documents.append(Document(
+                text=text,
+                metadata={
+                    "source": file_path,
+                    "type": "pdf",
+                    "method": "liteparse",
+                    "page_label": str(page + 1),
                     },
                 ))
         if not documents:
