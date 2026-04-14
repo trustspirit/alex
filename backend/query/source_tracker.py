@@ -35,11 +35,18 @@ class SourceTracker:
         sources: list[dict] = []
         for node_with_score in response.source_nodes:
             metadata = node_with_score.node.metadata
+            # Page number can be stored under different keys depending on the loader
+            page = (
+                metadata.get("page_label")
+                or metadata.get("page")
+                or metadata.get("page_number")
+            )
+
             sources.append(
                 {
                     "source": metadata.get("source", ""),
                     "type": metadata.get("type", ""),
-                    "page": metadata.get("page"),
+                    "page": page,
                     "score": node_with_score.score,
                     "fallback": bool(metadata.get("fallback", False)),
                 }
