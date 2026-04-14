@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.storage.models import Setting
 
-KEYRING_SERVICE = "rag-knowledge-app"
+KEYRING_SERVICE = "alex"
 _SECRET_MARKER = "__secret__"
 
 

@@ -10,7 +10,7 @@ class Base(DeclarativeBase):
     pass
 
 
-DEFAULT_DATA_DIR = Path.home() / ".rag-knowledge-app"
+DEFAULT_DATA_DIR = Path.home() / ".alex"
 
 
 def get_engine(data_dir: Path = DEFAULT_DATA_DIR):

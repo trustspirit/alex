@@ -45,14 +45,14 @@ def test_set_and_get_secret(tmp_db):
 
         # Should store actual value in keyring
         mock_keyring.set_password.assert_called_once_with(
-            "rag-knowledge-app", "api_key", "super_secret_value"
+            "alex", "api_key", "super_secret_value"
         )
 
         # Retrieving the secret should use keyring
         value = repo.get_secret("api_key")
         assert value == "super_secret_value"
         mock_keyring.get_password.assert_called_once_with(
-            "rag-knowledge-app", "api_key"
+            "alex", "api_key"
         )
 
 

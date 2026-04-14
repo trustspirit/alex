@@ -21,7 +21,7 @@ from backend.indexing.index_manager import IndexManager
 from backend.ingestion.pipeline import IngestionPipeline
 from backend.query.query_engine import QueryEngine
 
-DATA_DIR = Path.home() / ".rag-knowledge-app"
+DATA_DIR = Path.home() / ".alex"
 LOG_DIR = DATA_DIR / "logs"
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ def setup_logging() -> None:
 def start_app() -> None:
     """Wire all components together and launch the PyWebView window."""
     setup_logging()
-    logger.info("Starting RAG Knowledge App …")
+    logger.info("Starting Alex …")
 
     # ------------------------------------------------------------------
     # Storage
@@ -185,7 +185,7 @@ def start_app() -> None:
         return
 
     window = webview.create_window(
-        title="RAG Knowledge App",
+        title="Alex",
         url=url,
         js_api=bridge,
         width=1200,
