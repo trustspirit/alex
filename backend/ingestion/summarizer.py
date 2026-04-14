@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 
+from backend.llm.retry import with_retry
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -52,7 +54,7 @@ class Summarizer:
         """
         truncated = full_text[:_MAX_DOC_CHARS]
         prompt = SUMMARY_PROMPT.format(text=truncated)
-        response = self._llm.complete(prompt)
+        response = with_retry(lambda: self._llm.complete(prompt))
         summary: str = response.text.strip()
         logger.debug("Document summary generated (%d chars).", len(summary))
         return summary
@@ -73,7 +75,7 @@ class Summarizer:
         summaries: dict[str, str] = {}
         for node in nodes:
             prompt = CHUNK_SUMMARY_PROMPT.format(text=node.text)
-            response = self._llm.complete(prompt)
+            response = with_retry(lambda: self._llm.complete(prompt))
             summaries[node.id_] = response.text.strip()
         logger.debug("Chunk summaries generated for %d nodes.", len(summaries))
         return summaries
@@ -94,7 +96,7 @@ class Summarizer:
             LLM response.
         """
         prompt = QA_PROMPT.format(text=text)
-        response = self._llm.complete(prompt)
+        response = with_retry(lambda: self._llm.complete(prompt))
         qa_pairs = self._parse_qa(response.text)
         logger.debug("Generated %d Q&A pairs.", len(qa_pairs))
         return qa_pairs

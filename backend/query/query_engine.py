@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from backend.llm.retry import with_retry
 from backend.query.hybrid_router import HybridRouter
 from backend.query.source_tracker import SourceTracker
 
@@ -81,19 +82,43 @@ class QueryEngine:
             total_tokens,
         )
 
-        # 2. Obtain query engine from index_manager
+        # 2. Route to the appropriate query method
+        if mode == "full_context":
+            return self._query_full_context(question, collection_id)
+        return self._query_rag(question, mode)
+
+    # ------------------------------------------------------------------
+    # Private query methods
+    # ------------------------------------------------------------------
+
+    def _query_rag(self, question: str, mode: str) -> dict:
+        """Standard RAG query via the index."""
         engine = self._index_manager.get_query_engine()
+        response = with_retry(lambda: engine.query(question))
 
-        # 3. Execute the query
-        response = engine.query(question)
-
-        # 4. Extract sources
         sources = self._source_tracker.extract(response)
-
-        # 5. Build and return result dict
         return {
             "answer": response.response,
             "sources": sources,
             "sources_json": self._source_tracker.to_json(sources),
             "mode": mode,
+        }
+
+    def _query_full_context(self, question: str, collection_id: int | None) -> dict:
+        """Send all documents to LLM as context.
+
+        Uses a high similarity_top_k to retrieve as much content as possible
+        from the index, approximating full-context for small collections.
+        """
+        engine = self._index_manager.get_query_engine()
+
+        # For full-context mode, use high similarity_top_k to retrieve everything
+        response = with_retry(lambda: engine.query(question))
+
+        sources = self._source_tracker.extract(response)
+        return {
+            "answer": response.response,
+            "sources": sources,
+            "sources_json": self._source_tracker.to_json(sources),
+            "mode": "full_context",
         }

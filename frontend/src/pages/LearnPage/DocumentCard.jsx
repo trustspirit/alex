@@ -18,7 +18,8 @@ const Card = styled.div`
     box-shadow: ${({ theme }) => theme.shadows.md};
   }
 
-  &:hover [data-delete] {
+  &:hover [data-delete],
+  &:hover [data-reindex] {
     opacity: 1;
   }
 `;
@@ -64,7 +65,7 @@ const SourceBadge = styled.span`
   }};
 `;
 
-const DeleteButton = styled.button`
+const ActionButton = styled.button`
   opacity: 0;
   background: none;
   border: none;
@@ -76,10 +77,13 @@ const DeleteButton = styled.button`
   flex-shrink: 0;
 
   &:hover {
-    color: ${({ theme }) => theme.colors.error};
-    background: ${({ theme }) => theme.colors.errorBg};
+    color: ${({ $variant, theme }) => $variant === 'danger' ? theme.colors.error : theme.colors.primary};
+    background: ${({ $variant, theme }) => $variant === 'danger' ? theme.colors.errorBg : 'rgba(59,130,246,0.08)'};
   }
 `;
+
+const DeleteButton = styled(ActionButton).attrs({ $variant: 'danger' })``;
+const ReindexButton = styled(ActionButton).attrs({ $variant: 'primary' })``;
 
 const CardMeta = styled.div`
   display: flex;
@@ -164,6 +168,15 @@ const TrashIcon = () => (
   </svg>
 );
 
+const RefreshIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 2v5h5" />
+    <path d="M15 14v-5h-5" />
+    <path d="M2.3 10a6 6 0 0 0 10.3 1.4l2.4-2.4" />
+    <path d="M13.7 6A6 6 0 0 0 3.4 4.6L1 7" />
+  </svg>
+);
+
 const WarnTriangle = () => (
   <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M8 2L14 13H2L8 2z" />
@@ -188,7 +201,7 @@ function formatRelativeDate(dateStr) {
   return date.toLocaleDateString();
 }
 
-function DocumentCard({ doc, docProgress, docWarnings, onDelete }) {
+function DocumentCard({ doc, docProgress, docWarnings, onDelete, onReindex }) {
   const status = doc.status || 'pending';
   const pct = docProgress?.percent ?? 0;
   const hasWarning = doc.fallback_used || (docWarnings && docWarnings.length > 0);
@@ -212,6 +225,15 @@ function DocumentCard({ doc, docProgress, docWarnings, onDelete }) {
             </WarningIcon>
           )}
         </TitleRow>
+        {onReindex && (
+          <ReindexButton
+            data-reindex
+            title="Re-index document"
+            onClick={() => onReindex(doc.id)}
+          >
+            <RefreshIcon />
+          </ReindexButton>
+        )}
         <DeleteButton
           data-delete
           title="Delete document"

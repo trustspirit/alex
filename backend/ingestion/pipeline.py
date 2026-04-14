@@ -102,6 +102,17 @@ class IngestionPipeline:
             if nodes:
                 self._summarizer.summarize_chunks(nodes)
 
+            # Step 7b: Generate QA pairs and add as extra nodes
+            if self._llm and nodes:
+                try:
+                    qa_pairs = self._summarizer.generate_qa_pairs(full_text[:4000])
+                    for qa in qa_pairs:
+                        qa_text = f"Q: {qa['question']}\nA: {qa['answer']}"
+                        qa_node = type(nodes[0])(text=qa_text, metadata={"type": "qa_pair", "source": source_path})
+                        nodes.append(qa_node)
+                except Exception as exc:
+                    logger.warning("QA pair generation failed: %s", exc)
+
             # Step 8: Indexing
             self._emit_progress(doc_id, "indexing", 70)
             if nodes:
@@ -153,6 +164,24 @@ class IngestionPipeline:
 
         return doc_id
 
+    def reingest_async(
+        self,
+        doc_id: int,
+        source_path: str,
+        source_type: str,
+        collection_id: int | None = None,
+        on_progress: Callable | None = None,
+        on_warning: Callable | None = None,
+    ) -> None:
+        """Re-ingest an existing document (doc already exists in DB)."""
+        thread = threading.Thread(
+            target=self._run_ingestion,
+            args=(doc_id, source_path, source_type, collection_id, None),
+            kwargs={"on_progress": on_progress, "on_warning": on_warning},
+            daemon=True,
+        )
+        thread.start()
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -202,6 +231,17 @@ class IngestionPipeline:
             self._summarizer.summarize_document(full_text)
             if nodes:
                 self._summarizer.summarize_chunks(nodes)
+
+            # Generate QA pairs and add as extra nodes
+            if self._llm and nodes:
+                try:
+                    qa_pairs = self._summarizer.generate_qa_pairs(full_text[:4000])
+                    for qa in qa_pairs:
+                        qa_text = f"Q: {qa['question']}\nA: {qa['answer']}"
+                        qa_node = type(nodes[0])(text=qa_text, metadata={"type": "qa_pair", "source": source_path})
+                        nodes.append(qa_node)
+                except Exception as exc:
+                    logger.warning("QA pair generation failed: %s", exc)
 
             self._emit_progress(doc_id, "indexing", 70, progress_cb)
             if nodes:

@@ -92,6 +92,18 @@ export function useLearn() {
     [call]
   );
 
+  const reindexDocument = useCallback(
+    async (docId) => {
+      try {
+        await call('reindex_document', docId);
+        await refreshDocuments();
+      } catch (err) {
+        console.error('[useLearn] reindexDocument failed:', err);
+      }
+    },
+    [call, refreshDocuments]
+  );
+
   const selectCollection = useCallback((collId) => {
     setSelectedCollection(collId);
   }, []);
@@ -154,6 +166,7 @@ export function useLearn() {
     uploadFiles,
     uploadYoutube,
     deleteDocument,
+    reindexDocument,
     selectCollection,
     createCollection,
     renameCollection,

@@ -17,7 +17,7 @@ const EmptyState = styled.div`
   background: ${({ theme }) => theme.colors.surface};
 `;
 
-function DocumentList({ documents, progress, warnings, onDelete }) {
+function DocumentList({ documents, progress, warnings, onDelete, onReindex }) {
   if (!documents || documents.length === 0) {
     return (
       <EmptyState>
@@ -38,6 +38,7 @@ function DocumentList({ documents, progress, warnings, onDelete }) {
             docProgress={docProgress}
             docWarnings={docWarnings}
             onDelete={onDelete}
+            onReindex={onReindex}
           />
         );
       })}

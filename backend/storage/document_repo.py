@@ -90,6 +90,21 @@ class DocumentRepo:
             doc.title = title
             self._session.commit()
 
+    def update_status_and_reset(self, doc_id: int) -> None:
+        """Reset document for re-indexing."""
+        doc = self.get_by_id(doc_id)
+        if doc:
+            doc.status = "pending"
+            doc.token_count = 0
+            self._session.commit()
+
+    def move_to_collection(self, doc_id: int, collection_id: int | None) -> None:
+        """Move a document to a different collection."""
+        doc = self.get_by_id(doc_id)
+        if doc:
+            doc.collection_id = collection_id
+            self._session.commit()
+
     def delete(self, doc_id: int) -> None:
         doc = self.get_by_id(doc_id)
         if doc is not None:

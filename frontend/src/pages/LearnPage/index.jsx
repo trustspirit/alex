@@ -70,6 +70,7 @@ function LearnPage() {
     uploadFiles,
     uploadYoutube,
     deleteDocument,
+    reindexDocument,
     selectCollection,
     createCollection,
     renameCollection,
@@ -117,6 +118,7 @@ function LearnPage() {
               progress={progress}
               warnings={warnings}
               onDelete={deleteDocument}
+              onReindex={reindexDocument}
             />
           </section>
         </MainContent>

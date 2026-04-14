@@ -238,6 +238,32 @@ class BridgeAPI:
         self._document_repo.delete(doc_id)
         return {"success": True}
 
+    def reindex_document(self, doc_id: int) -> dict:
+        """Re-ingest an existing document."""
+        doc = self._document_repo.get_by_id(doc_id)
+        if not doc:
+            return {"error": "Document not found"}
+
+        # Reset and re-ingest
+        self._document_repo.update_status(doc_id, "pending")
+
+        def _on_progress(d_id, step, pct):
+            self._push_js("onIngestProgress", {"doc_id": d_id, "step": step, "percent": pct})
+
+        def _on_warning(d_id, warning):
+            self._push_js("onIngestWarning", {"doc_id": d_id, "warning": warning})
+
+        self._pipeline.reingest_async(
+            doc_id, doc.source_path, doc.source_type, doc.collection_id,
+            on_progress=_on_progress, on_warning=_on_warning,
+        )
+        return {"doc_id": doc_id, "status": "reindexing"}
+
+    def move_document(self, doc_id: int, collection_id: int | None) -> dict:
+        """Move a document to a different collection."""
+        self._document_repo.move_to_collection(doc_id, collection_id)
+        return {"success": True}
+
     # ------------------------------------------------------------------
     # Collection API
     # ------------------------------------------------------------------
