@@ -1,7 +1,7 @@
 # Core
 pywebview>=5.0
 llama-index>=0.14.0
-llama-parse>=0.6.0
+llama-cloud>=2.0.0
 chromadb>=0.5.0
 
 # LlamaIndex integrations

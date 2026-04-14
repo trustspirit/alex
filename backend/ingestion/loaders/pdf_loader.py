@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 try:
-    from llama_parse import LlamaParse
-except Exception:  # ImportError or any install-time error
-    LlamaParse = None  # type: ignore[assignment,misc]
+    from llama_cloud import LlamaCloud as _LlamaCloud
+except Exception:
+    _LlamaCloud = None  # type: ignore[assignment,misc]
 
 try:
     from liteparse import LiteParse as _LiteParse
@@ -141,19 +141,39 @@ class PdfLoader:
     # ------------------------------------------------------------------
 
     def _load_llamaparse(self, file_path: str) -> list:
-        if LlamaParse is None:
-            raise ImportError("llama_parse is not installed")
+        if _LlamaCloud is None:
+            raise ImportError("llama-cloud SDK is not installed")
         if not self._llamaparse_api_key:
             raise ValueError("LlamaParse API key is not configured")
-        parser = LlamaParse(
-            api_key=self._llamaparse_api_key,
-            result_type="markdown",
-            skip_diagonal_text=True,
+        from backend.ingestion.loaders.document import Document
+
+        client = _LlamaCloud(api_key=self._llamaparse_api_key)
+        result = client.parsing.parse(
+            tier="agentic",
+            version="latest",
+            upload_file=open(file_path, "rb"),
+            expand=["markdown"],
         )
-        docs = parser.load_data(file_path)
-        if not docs:
+
+        documents = []
+        if result.markdown and result.markdown.pages:
+            for page in result.markdown.pages:
+                text = page.markdown or ""
+                if not text.strip():
+                    continue
+                documents.append(Document(
+                    text=text,
+                    metadata={
+                        "source": file_path,
+                        "type": "pdf",
+                        "method": "llamaparse",
+                        "page_label": str(page.page_number),
+                    },
+                ))
+
+        if not documents:
             raise RuntimeError("LlamaParse returned empty result")
-        return docs
+        return documents
 
     def _load_liteparse(self, file_path: str) -> list:
         if _LiteParse is None:
