@@ -163,13 +163,14 @@ function FileUpload({ onUploadFiles, onUploadYoutube, isUploading }) {
     (e) => {
       e.preventDefault();
       setIsDragging(false);
-      const files = Array.from(e.dataTransfer.files);
-      if (files.length > 0) onUploadFiles(files);
+      // PyWebView drag & drop does NOT provide file paths (only filenames).
+      // Trigger native file dialog instead so we get full paths from the OS.
+      onUploadFiles(null);
     },
     [onUploadFiles]
   );
 
-  // Click opens native OS file dialog via Python bridge
+  // Click also opens native OS file dialog via Python bridge
   const handleClick = useCallback(() => {
     onUploadFiles(null);
   }, [onUploadFiles]);
