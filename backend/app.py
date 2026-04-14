@@ -102,6 +102,12 @@ def start_app() -> None:
         embed_model_name = settings_repo.get("embed_model") or "text-embedding-3-small"
         embed_api_key = settings_repo.get_secret(f"{embed_provider}_api_key") or ""
 
+        # LlamaIndex internally checks OPENAI_API_KEY env var even when api_key
+        # is passed explicitly. Set it so downstream index loading works.
+        if embed_api_key and embed_provider == "openai":
+            import os
+            os.environ.setdefault("OPENAI_API_KEY", embed_api_key)
+
         if embed_api_key:
             embed_model = provider_manager.create_embed_model(
                 embed_provider, embed_api_key, embed_model_name
