@@ -173,15 +173,15 @@ const blink = keyframes`
 
 const MessageRow = styled.div`
   display: flex;
-  padding: 24px 0;
+  padding: 20px 24px;
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderLight};
+  background: ${({ $isUser }) => $isUser ? '#F8FAFC' : 'transparent'};
+  border-left: 3px solid ${({ $isUser, theme }) => $isUser ? '#CBD5E1' : theme.colors.primary};
 
   &:last-child {
     border-bottom: none;
   }
 `;
-
-/* Avatar removed — only sender name is shown */
 
 const MessageBody = styled.div`
   flex: 1;
@@ -193,7 +193,7 @@ const MessageBody = styled.div`
 const SenderName = styled.div`
   font-size: ${({ theme }) => theme.fontSizes.sm};
   font-weight: 600;
-  color: ${({ theme }) => theme.colors.text};
+  color: ${({ $isUser, theme }) => $isUser ? theme.colors.textSecondary : theme.colors.primary};
   margin-bottom: 6px;
 `;
 
@@ -355,9 +355,9 @@ function MessageBubble({ message, streamingText, isStreaming }) {
   // Streaming placeholder
   if (!message && isStreaming) {
     return (
-      <MessageRow>
-          <MessageBody>
-          <SenderName>Alex</SenderName>
+      <MessageRow $isUser={false}>
+        <MessageBody>
+          <SenderName $isUser={false}>Alex</SenderName>
           <Content>
             <MarkdownContent text={streamingText || ''} />
             <Cursor />
@@ -373,9 +373,9 @@ function MessageBubble({ message, streamingText, isStreaming }) {
   const hasSources = sources.length > 0;
 
   return (
-    <MessageRow>
+    <MessageRow $isUser={isUser}>
       <MessageBody>
-        <SenderName>{isUser ? 'You' : 'Alex'}</SenderName>
+        <SenderName $isUser={isUser}>{isUser ? 'You' : 'Alex'}</SenderName>
         <Content $isError={isError}>
           {isError ? message.content : <MarkdownContent text={message.content} />}
         </Content>
