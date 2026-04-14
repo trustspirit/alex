@@ -198,13 +198,12 @@ class BridgeAPI:
                 {"doc_id": doc_id, "warning": warning},
             )
 
-        self._pipeline._on_progress = _on_progress
-        self._pipeline._on_warning = _on_warning
-
         doc_id = self._pipeline.ingest_async(
             source_path=source_path,
             source_type=source_type,
             collection_id=collection_id,
+            on_progress=_on_progress,
+            on_warning=_on_warning,
         )
         return {"doc_id": doc_id, "status": "processing"}
 
@@ -321,3 +320,30 @@ class BridgeAPI:
         except Exception as exc:
             logger.warning("open_file_dialog failed: %s", exc)
             return None
+
+    # ------------------------------------------------------------------
+    # Aliases for frontend compatibility
+    # ------------------------------------------------------------------
+
+    def list_sessions(self) -> list[dict]:
+        return self.get_chat_sessions()
+
+    def list_collections(self) -> list[dict]:
+        return self.get_collections()
+
+    def list_documents(self, collection_id: int | None = None) -> list[dict]:
+        return self.get_documents(collection_id)
+
+    def get_messages(self, session_id: int) -> list[dict]:
+        return self.get_chat_messages(session_id)
+
+    def create_session(self, title: str = "New Chat") -> dict:
+        session = self._chat_repo.create_session(title=title)
+        return {
+            "id": session.id,
+            "title": session.title,
+            "updated_at": session.updated_at.isoformat() if session.updated_at else None,
+        }
+
+    def delete_session(self, session_id: int) -> dict:
+        return self.delete_chat_session(session_id)

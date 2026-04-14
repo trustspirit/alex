@@ -84,6 +84,12 @@ class DocumentRepo:
         )
         return result if result is not None else 0
 
+    def update_title(self, doc_id: int, title: str) -> None:
+        doc = self.get_by_id(doc_id)
+        if doc:
+            doc.title = title
+            self._session.commit()
+
     def delete(self, doc_id: int) -> None:
         doc = self.get_by_id(doc_id)
         if doc is not None:

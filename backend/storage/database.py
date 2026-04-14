@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, scoped_session, sessionmaker
 
 
 class Base(DeclarativeBase):
@@ -23,6 +23,12 @@ def get_session_factory(engine=None):
     if engine is None:
         engine = get_engine()
     return sessionmaker(bind=engine)
+
+
+def get_scoped_session_factory(engine=None):
+    if engine is None:
+        engine = get_engine()
+    return scoped_session(sessionmaker(bind=engine))
 
 
 def init_db(engine=None):

@@ -124,6 +124,8 @@ class IngestionPipeline:
         source_type: str,
         collection_id: int | None = None,
         tags: list | None = None,
+        on_progress: Callable | None = None,
+        on_warning: Callable | None = None,
     ) -> int:
         """Start ingestion in a background thread and return doc_id immediately.
 
@@ -143,7 +145,8 @@ class IngestionPipeline:
 
         thread = threading.Thread(
             target=self._run_ingestion,
-            args=(doc_id, source_path, source_type, collection_id, tags),
+            args=(doc_id, source_path, source_type, collection_id, tags,
+                  on_progress, on_warning),
             daemon=True,
         )
         thread.start()
@@ -161,40 +164,50 @@ class IngestionPipeline:
         source_type: str,
         collection_id: int | None,
         tags: list | None,
+        on_progress: Callable | None = None,
+        on_warning: Callable | None = None,
     ) -> None:
         """Background-thread ingestion body (doc already created)."""
+        # Use per-invocation callbacks if provided, else fall back to instance-level
+        progress_cb = on_progress or self._on_progress
+        warning_cb = on_warning or self._on_warning
+
         try:
             self._doc_repo.update_status(doc_id, "processing")
-            self._emit_progress(doc_id, "extracting", 10)
+            self._emit_progress(doc_id, "extracting", 10, progress_cb)
 
             load_result = self._load(source_path, source_type)
 
             if load_result.fallback_used:
                 self._doc_repo.set_fallback(doc_id, load_result.fallback_warning)
-                self._emit_warning(doc_id, load_result.fallback_warning)
+                self._emit_warning(doc_id, load_result.fallback_warning, warning_cb)
 
             metadata = extract_metadata(load_result.documents, source_path, source_type)
             token_count = metadata.get("token_count", 0)
             self._doc_repo.set_token_count(doc_id, token_count)
 
-            self._emit_progress(doc_id, "chunking", 30)
+            title = metadata.get("title", "")
+            if title:
+                self._doc_repo.update_title(doc_id, title)
+
+            self._emit_progress(doc_id, "chunking", 30, progress_cb)
             nodes = self._chunker.chunk(
                 load_result.documents,
                 has_structure=load_result.has_structure,
                 embed_model=self._embed_model,
             )
 
-            self._emit_progress(doc_id, "summarizing", 50)
+            self._emit_progress(doc_id, "summarizing", 50, progress_cb)
             full_text = "\n".join(doc_obj.text for doc_obj in load_result.documents)
             self._summarizer.summarize_document(full_text)
             if nodes:
                 self._summarizer.summarize_chunks(nodes)
 
-            self._emit_progress(doc_id, "indexing", 70)
+            self._emit_progress(doc_id, "indexing", 70, progress_cb)
             if nodes:
                 self._index_manager.build_vector_index(nodes)
 
-            self._emit_progress(doc_id, "completed", 100)
+            self._emit_progress(doc_id, "completed", 100, progress_cb)
             self._doc_repo.update_status(doc_id, "completed")
 
         except Exception as exc:
@@ -220,16 +233,20 @@ class IngestionPipeline:
         else:
             raise ValueError(f"Unsupported source_type: '{source_type}'")
 
-    def _emit_progress(self, doc_id: int, step: str, percent: int) -> None:
-        if self._on_progress is not None:
+    def _emit_progress(self, doc_id: int, step: str, percent: int,
+                        callback: Callable | None = None) -> None:
+        cb = callback or self._on_progress
+        if cb is not None:
             try:
-                self._on_progress(doc_id, step, percent)
+                cb(doc_id, step, percent)
             except Exception as exc:
                 logger.warning("on_progress callback raised: %s", exc)
 
-    def _emit_warning(self, doc_id: int, warning: str | None) -> None:
-        if self._on_warning is not None and warning is not None:
+    def _emit_warning(self, doc_id: int, warning: str | None,
+                       callback: Callable | None = None) -> None:
+        cb = callback or self._on_warning
+        if cb is not None and warning is not None:
             try:
-                self._on_warning(doc_id, warning)
+                cb(doc_id, warning)
             except Exception as exc:
                 logger.warning("on_warning callback raised: %s", exc)

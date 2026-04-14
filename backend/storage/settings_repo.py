@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-import keyring
+try:
+    import keyring
+except ImportError:
+    keyring = None  # type: ignore[assignment]
+
 from sqlalchemy.orm import Session
 
 from backend.storage.models import Setting
@@ -32,9 +36,13 @@ class SettingsRepo:
         return setting
 
     def get_secret(self, key: str) -> str | None:
+        if keyring is None:
+            return None
         return keyring.get_password(KEYRING_SERVICE, key)
 
     def set_secret(self, key: str, value: str) -> None:
+        if keyring is None:
+            raise RuntimeError("keyring package is not installed")
         keyring.set_password(KEYRING_SERVICE, key, value)
         # Store a marker in SQLite so we know a secret exists for this key
         setting = self._session.query(Setting).filter_by(key=key).first()

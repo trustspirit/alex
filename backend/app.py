@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import logging.handlers
 import sys
 from pathlib import Path
 
@@ -10,7 +11,7 @@ except ImportError:  # pragma: no cover
     webview = None  # type: ignore[assignment]
 
 from backend.bridge import BridgeAPI
-from backend.storage.database import get_engine, get_session_factory, init_db
+from backend.storage.database import get_engine, get_scoped_session_factory, init_db
 from backend.storage.collection_repo import CollectionRepo
 from backend.storage.document_repo import DocumentRepo
 from backend.storage.chat_repo import ChatRepo
@@ -34,7 +35,9 @@ def setup_logging() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         handlers=[
-            logging.FileHandler(LOG_DIR / "app.log"),
+            logging.handlers.TimedRotatingFileHandler(
+                LOG_DIR / "app.log", when="midnight", backupCount=30
+            ),
             logging.StreamHandler(sys.stdout),
         ],
     )
@@ -50,8 +53,8 @@ def start_app() -> None:
     # ------------------------------------------------------------------
     engine = get_engine(DATA_DIR)
     init_db(engine)
-    SessionFactory = get_session_factory(engine)
-    db_session = SessionFactory()
+    ScopedSession = get_scoped_session_factory(engine)
+    db_session = ScopedSession()
 
     document_repo = DocumentRepo(db_session)
     collection_repo = CollectionRepo(db_session)
@@ -70,8 +73,8 @@ def start_app() -> None:
     embed_model = None
 
     try:
-        llm_provider = settings_repo.get("llm_provider") or "openai"
-        llm_model = settings_repo.get("llm_model") or "gpt-4o-mini"
+        llm_provider = settings_repo.get("default_provider") or "openai"
+        llm_model = settings_repo.get("default_model") or "gpt-4o-mini"
         llm_api_key = settings_repo.get_secret(f"{llm_provider}_api_key") or ""
 
         if llm_api_key:
