@@ -57,12 +57,14 @@ class QueryEngine:
         llm,
         document_repo,
         hybrid_router: HybridRouter | None = None,
+        settings_repo=None,
     ) -> None:
         self._index_manager = index_manager
         self._llm = llm
         self._document_repo = document_repo
         self._router: HybridRouter = hybrid_router or HybridRouter()
         self._source_tracker = SourceTracker()
+        self._settings_repo = settings_repo
 
     # ------------------------------------------------------------------
     # Public API
@@ -116,10 +118,38 @@ class QueryEngine:
     # ------------------------------------------------------------------
 
     def _get_qa_prompt(self):
-        """Return a custom QA prompt template if available."""
-        if PromptTemplate is not None:
-            return PromptTemplate(QA_PROMPT_TMPL)
-        return None
+        """Return a QA prompt template, incorporating user's custom system prompt if set."""
+        if PromptTemplate is None:
+            return None
+
+        custom_prompt = ""
+        if self._settings_repo:
+            custom_prompt = self._settings_repo.get("system_prompt") or ""
+
+        if custom_prompt.strip():
+            tmpl = (
+                "You are a knowledgeable assistant. Use the provided context to answer the question.\n"
+                "\n"
+                "Rules:\n"
+                "- Answer in the SAME LANGUAGE as the question. If the question is in Korean, answer in Korean.\n"
+                "- Provide detailed, thorough answers. Include names, dates, places, and specific details from the context.\n"
+                "- Do not give one-word or one-phrase answers. Explain with full sentences.\n"
+                "- If the context contains relevant details, include them all in your answer.\n"
+                "- If you don't know, say so honestly.\n"
+                "\n"
+                f"Additional instructions from user:\n{custom_prompt}\n"
+                "\n"
+                "Context:\n"
+                "-----\n"
+                "{context_str}\n"
+                "-----\n"
+                "\n"
+                "Question: {query_str}\n"
+                "Answer: "
+            )
+            return PromptTemplate(tmpl)
+
+        return PromptTemplate(QA_PROMPT_TMPL)
 
     def _query_rag(self, question: str, mode: str) -> dict:
         """Standard RAG query via the index."""

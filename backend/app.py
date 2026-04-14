@@ -172,6 +172,7 @@ def start_app() -> None:
         index_manager=index_manager,
         llm=llm,
         document_repo=document_repo,
+        settings_repo=settings_repo,
     )
 
     # ------------------------------------------------------------------

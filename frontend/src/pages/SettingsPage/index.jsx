@@ -61,6 +61,37 @@ const LoadingText = styled.p`
   margin: 0;
 `;
 
+const SystemPromptArea = styled.textarea`
+  width: 100%;
+  min-height: 120px;
+  padding: 12px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.text};
+  font-family: ${({ theme }) => theme.fonts.mono};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+
+  &:focus {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.textTertiary};
+  }
+`;
+
+const SavedIndicator = styled.span`
+  display: inline-block;
+  margin-top: 8px;
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  color: ${({ theme }) => theme.colors.success};
+`;
+
 function SettingsPage() {
   const {
     providers,
@@ -130,6 +161,25 @@ function SettingsPage() {
             onSelectModel={selectDefaultModel}
             onSelectEmbedModel={selectEmbedModel}
           />
+        )}
+      </Section>
+
+      <Section>
+        <SectionHeader>
+          <SectionTitle>System Prompt</SectionTitle>
+          <SectionDesc>
+            Customize how the AI responds to your questions. This prompt is sent with every query.
+          </SectionDesc>
+        </SectionHeader>
+
+        <SystemPromptArea
+          value={settings.system_prompt || ''}
+          onChange={(e) => saveSetting('system_prompt', e.target.value)}
+          placeholder={`Example:\n- Answer in Korean\n- Provide detailed explanations\n- Include page references when possible`}
+          rows={6}
+        />
+        {saving.system_prompt === 'saved' && (
+          <SavedIndicator>Saved</SavedIndicator>
         )}
       </Section>
     </PageWrapper>
