@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react';
-import styled, { keyframes, css } from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import SourceCard from './SourceCard';
 
-// Minimal markdown rendering: bold, inline code, code blocks, simple lists
+// ---------------------------------------------------------------------------
+// Minimal markdown renderer
+// ---------------------------------------------------------------------------
+
 function renderMarkdown(text) {
   if (!text) return [];
-
   const lines = text.split('\n');
   const result = [];
   let i = 0;
@@ -15,13 +17,22 @@ function renderMarkdown(text) {
 
     // Fenced code blocks
     if (line.startsWith('```')) {
+      const lang = line.slice(3).trim();
       const codeLines = [];
       i++;
       while (i < lines.length && !lines[i].startsWith('```')) {
         codeLines.push(lines[i]);
         i++;
       }
-      result.push({ type: 'code', content: codeLines.join('\n') });
+      result.push({ type: 'code', content: codeLines.join('\n'), lang });
+      i++;
+      continue;
+    }
+
+    // Headings
+    const headingMatch = line.match(/^(#{1,4})\s+(.+)/);
+    if (headingMatch) {
+      result.push({ type: `h${headingMatch[1].length}`, content: headingMatch[2] });
       i++;
       continue;
     }
@@ -55,7 +66,7 @@ function renderMarkdown(text) {
       continue;
     }
 
-    // Normal paragraph text
+    // Normal paragraph
     result.push({ type: 'p', content: line });
     i++;
   }
@@ -113,10 +124,15 @@ function MarkdownContent({ text }) {
         if (block.type === 'code') {
           return (
             <CodeBlock key={idx}>
+              {block.lang && <CodeLang>{block.lang}</CodeLang>}
               <code>{block.content}</code>
             </CodeBlock>
           );
         }
+        if (block.type === 'h1') return <Heading1 key={idx}><InlineContent text={block.content} /></Heading1>;
+        if (block.type === 'h2') return <Heading2 key={idx}><InlineContent text={block.content} /></Heading2>;
+        if (block.type === 'h3') return <Heading3 key={idx}><InlineContent text={block.content} /></Heading3>;
+        if (block.type === 'h4') return <Heading4 key={idx}><InlineContent text={block.content} /></Heading4>;
         if (block.type === 'ul') {
           return (
             <StyledUl key={idx}>
@@ -135,18 +151,20 @@ function MarkdownContent({ text }) {
             </StyledOl>
           );
         }
-        if (block.type === 'br') {
-          return <div key={idx} style={{ height: '0.5em' }} />;
-        }
+        if (block.type === 'br') return <Spacer key={idx} />;
         return (
-          <p key={idx} style={{ margin: 0 }}>
+          <Paragraph key={idx}>
             <InlineContent text={block.content} />
-          </p>
+          </Paragraph>
         );
       })}
     </>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Styled Components — Claude/ChatGPT style
+// ---------------------------------------------------------------------------
 
 const blink = keyframes`
   0%, 100% { opacity: 1; }
@@ -155,36 +173,88 @@ const blink = keyframes`
 
 const MessageRow = styled.div`
   display: flex;
-  justify-content: ${({ $isUser }) => ($isUser ? 'flex-end' : 'flex-start')};
-  padding: 4px 0;
+  gap: 16px;
+  padding: 24px 0;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.borderLight};
+
+  &:last-child {
+    border-bottom: none;
+  }
 `;
 
-const BubbleWrap = styled.div`
-  max-width: 720px;
-  min-width: 60px;
-  ${({ $isUser }) => $isUser && css`min-width: 100px;`}
+const Avatar = styled.div`
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  background: ${({ $isUser, theme }) => $isUser ? '#E8E8E8' : theme.colors.primary};
+  color: ${({ $isUser }) => $isUser ? '#555' : '#fff'};
+  margin-top: 2px;
 `;
 
-const Bubble = styled.div`
-  padding: 12px 16px;
-  border-radius: ${({ theme }) => theme.radii.lg};
-  background: ${({ $isUser, theme }) =>
-    $isUser ? '#EFF6FF' : theme.colors.surface};
-  border: 1px solid ${({ $isUser, theme }) =>
-    $isUser ? '#DBEAFE' : theme.colors.border};
-  font-size: ${({ theme }) => theme.fontSizes.md};
-  line-height: 1.6;
-  color: ${({ $isError, theme }) => ($isError ? theme.colors.error : theme.colors.text)};
+const MessageBody = styled.div`
+  flex: 1;
+  min-width: 0;
   user-select: text;
   cursor: text;
+`;
 
-  p + p,
-  p + ul,
-  p + ol,
-  ul + p,
-  ol + p {
+const SenderName = styled.div`
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text};
+  margin-bottom: 6px;
+`;
+
+const Content = styled.div`
+  font-size: ${({ theme }) => theme.fontSizes.md};
+  line-height: 1.7;
+  color: ${({ $isError, theme }) => $isError ? theme.colors.error : theme.colors.text};
+
+  p + p, p + ul, p + ol, ul + p, ol + p {
     margin-top: 0.6em;
   }
+`;
+
+const Paragraph = styled.p`
+  margin: 0;
+`;
+
+const Spacer = styled.div`
+  height: 0.5em;
+`;
+
+const Heading1 = styled.h1`
+  font-size: 1.3em;
+  font-weight: 700;
+  margin: 0.8em 0 0.4em;
+  &:first-child { margin-top: 0; }
+`;
+
+const Heading2 = styled.h2`
+  font-size: 1.15em;
+  font-weight: 700;
+  margin: 0.7em 0 0.3em;
+  &:first-child { margin-top: 0; }
+`;
+
+const Heading3 = styled.h3`
+  font-size: 1em;
+  font-weight: 600;
+  margin: 0.6em 0 0.25em;
+  &:first-child { margin-top: 0; }
+`;
+
+const Heading4 = styled.h4`
+  font-size: 0.95em;
+  font-weight: 600;
+  margin: 0.5em 0 0.2em;
+  &:first-child { margin-top: 0; }
 `;
 
 const InlineCode = styled.code`
@@ -192,20 +262,21 @@ const InlineCode = styled.code`
   font-size: 0.85em;
   background: ${({ theme }) => theme.colors.bg};
   border: 1px solid ${({ theme }) => theme.colors.borderLight};
-  padding: 1px 5px;
-  border-radius: 3px;
+  padding: 2px 6px;
+  border-radius: 4px;
 `;
 
 const CodeBlock = styled.pre`
   font-family: ${({ theme }) => theme.fonts.mono};
   font-size: 0.8125rem;
-  background: ${({ theme }) => theme.colors.bg};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.md};
-  padding: 12px 14px;
+  background: #1E1E1E;
+  color: #D4D4D4;
+  border-radius: 8px;
+  padding: 14px 16px;
   overflow-x: auto;
-  margin: 0.5em 0;
+  margin: 0.6em 0;
   line-height: 1.5;
+  position: relative;
 
   code {
     font-family: inherit;
@@ -213,29 +284,39 @@ const CodeBlock = styled.pre`
     background: none;
     border: none;
     padding: 0;
+    color: inherit;
   }
+`;
+
+const CodeLang = styled.span`
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 11px;
+  color: #888;
+  text-transform: lowercase;
 `;
 
 const StyledUl = styled.ul`
   margin: 0.4em 0;
-  padding-left: 1.4em;
-  li + li { margin-top: 0.25em; }
+  padding-left: 1.5em;
+  li { margin-top: 0.3em; line-height: 1.6; }
 `;
 
 const StyledOl = styled.ol`
   margin: 0.4em 0;
   padding-left: 1.6em;
-  li + li { margin-top: 0.25em; }
+  li { margin-top: 0.3em; line-height: 1.6; }
 `;
 
 const Cursor = styled.span`
   display: inline-block;
   width: 2px;
   height: 1em;
-  background: ${({ theme }) => theme.colors.text};
+  background: ${({ theme }) => theme.colors.primary};
   margin-left: 2px;
   vertical-align: text-bottom;
-  animation: ${blink} 0.9s step-start infinite;
+  animation: ${blink} 0.8s step-start infinite;
 `;
 
 const SourceToggle = styled.button`
@@ -244,12 +325,12 @@ const SourceToggle = styled.button`
   gap: 5px;
   background: none;
   border: none;
-  padding: 5px 0 0;
-  color: ${({ theme }) => theme.colors.textSecondary};
+  padding: 8px 0 0;
+  color: ${({ theme }) => theme.colors.textTertiary};
   font-size: ${({ theme }) => theme.fontSizes.xs};
   cursor: pointer;
   font-family: inherit;
-  transition: color 0.1s;
+  transition: color 0.15s;
 
   &:hover {
     color: ${({ theme }) => theme.colors.text};
@@ -274,6 +355,10 @@ const ChevronIcon = () => (
   </svg>
 );
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 function MessageBubble({ message, streamingText, isStreaming }) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const toggleSources = useCallback(() => setSourcesOpen((v) => !v), []);
@@ -281,16 +366,18 @@ function MessageBubble({ message, streamingText, isStreaming }) {
   const isUser = message?.role === 'user';
   const isError = message?.isError;
 
-  // Streaming placeholder bubble
+  // Streaming placeholder
   if (!message && isStreaming) {
     return (
-      <MessageRow $isUser={false}>
-        <BubbleWrap>
-          <Bubble>
-            {streamingText || ''}
+      <MessageRow>
+        <Avatar $isUser={false}>A</Avatar>
+        <MessageBody>
+          <SenderName>Alex</SenderName>
+          <Content>
+            <MarkdownContent text={streamingText || ''} />
             <Cursor />
-          </Bubble>
-        </BubbleWrap>
+          </Content>
+        </MessageBody>
       </MessageRow>
     );
   }
@@ -301,15 +388,13 @@ function MessageBubble({ message, streamingText, isStreaming }) {
   const hasSources = sources.length > 0;
 
   return (
-    <MessageRow $isUser={isUser}>
-      <BubbleWrap $isUser={isUser}>
-        <Bubble $isUser={isUser} $isError={isError}>
-          {isError ? (
-            message.content
-          ) : (
-            <MarkdownContent text={message.content} />
-          )}
-        </Bubble>
+    <MessageRow>
+      <Avatar $isUser={isUser}>{isUser ? 'Y' : 'A'}</Avatar>
+      <MessageBody>
+        <SenderName>{isUser ? 'You' : 'Alex'}</SenderName>
+        <Content $isError={isError}>
+          {isError ? message.content : <MarkdownContent text={message.content} />}
+        </Content>
 
         {!isUser && hasSources && (
           <div>
@@ -327,7 +412,7 @@ function MessageBubble({ message, streamingText, isStreaming }) {
             )}
           </div>
         )}
-      </BubbleWrap>
+      </MessageBody>
     </MessageRow>
   );
 }
