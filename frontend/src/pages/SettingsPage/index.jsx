@@ -100,6 +100,13 @@ function SettingsPage() {
                 />
               </div>
             ))}
+            <Divider />
+            <ApiKeyForm
+              provider={{ name: 'llamaparse', display_name: 'LlamaParse (PDF parsing)' }}
+              savingStatus={saving['apiKey_llamaparse']}
+              onSave={saveApiKey}
+              hasExistingKey={settings['llamaparse_api_key'] === '__secret__'}
+            />
           </ProviderList>
         )}
       </Section>
