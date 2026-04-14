@@ -142,7 +142,9 @@ class PdfLoader:
 
     def _load_llamaparse(self, file_path: str) -> list:
         if LlamaParse is None:
-            raise ImportError("llama_cloud is not installed")
+            raise ImportError("llama_parse is not installed")
+        if not self._llamaparse_api_key:
+            raise ValueError("LlamaParse API key is not configured")
         parser = LlamaParse(
             api_key=self._llamaparse_api_key,
             result_type="markdown",
