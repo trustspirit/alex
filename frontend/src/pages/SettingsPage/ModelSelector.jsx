@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import styled from 'styled-components';
+import { useBridge } from '../../hooks/useBridge';
 
 const Grid = styled.div`
   display: grid;
@@ -61,6 +63,45 @@ const SavedBadge = styled.span`
   margin-left: 8px;
 `;
 
+const EmbedWarning = styled.div`
+  grid-column: 1 / -1;
+  background: ${({ theme }) => theme.colors.warningBg};
+  border: 1px solid ${({ theme }) => theme.colors.warning};
+  border-radius: ${({ theme }) => theme.radii.md};
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+`;
+
+const WarningText = styled.span`
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  color: ${({ theme }) => theme.colors.warning};
+`;
+
+const ReindexButton = styled.button`
+  padding: 6px 14px;
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  font-weight: 500;
+  color: #fff;
+  background: ${({ theme }) => theme.colors.warning};
+  border: none;
+  border-radius: ${({ theme }) => theme.radii.md};
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+
+  &:hover {
+    opacity: 0.85;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+`;
+
 function ModelSelector({
   providers,
   settings,
@@ -69,6 +110,10 @@ function ModelSelector({
   onSelectModel,
   onSelectEmbedModel,
 }) {
+  const { call } = useBridge();
+  const [embedChanged, setEmbedChanged] = useState(false);
+  const [reindexing, setReindexing] = useState(false);
+
   const currentProvider = settings.default_provider || '';
   const currentModel = settings.default_model || '';
   const currentEmbedModel = settings.embed_model || '';
@@ -97,6 +142,19 @@ function ModelSelector({
 
   function handleEmbedModelChange(e) {
     onSelectEmbedModel(e.target.value);
+    setEmbedChanged(true);
+  }
+
+  async function handleReindexAll() {
+    setReindexing(true);
+    try {
+      await call('reindex_all_documents');
+    } catch (err) {
+      console.error('[ModelSelector] reindex failed:', err);
+    } finally {
+      setReindexing(false);
+      setEmbedChanged(false);
+    }
   }
 
   return (
@@ -162,6 +220,17 @@ function ModelSelector({
           ))}
         </Select>
       </Field>
+
+      {embedChanged && (
+        <EmbedWarning>
+          <WarningText>
+            Changing the embedding model requires re-indexing all documents. This may take a while.
+          </WarningText>
+          <ReindexButton onClick={handleReindexAll} disabled={reindexing}>
+            {reindexing ? 'Re-indexing...' : 'Re-index All'}
+          </ReindexButton>
+        </EmbedWarning>
+      )}
     </Grid>
   );
 }

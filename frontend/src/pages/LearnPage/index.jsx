@@ -119,6 +119,7 @@ function LearnPage() {
               warnings={warnings}
               onDelete={deleteDocument}
               onReindex={reindexDocument}
+              onTagsChanged={refreshDocuments}
             />
           </section>
         </MainContent>

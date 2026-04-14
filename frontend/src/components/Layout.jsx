@@ -1,5 +1,6 @@
 import styled from 'styled-components';
 import { NavLink } from 'react-router-dom';
+import { useOnline } from '../hooks/useOnline';
 
 const Wrapper = styled.div`
   display: flex;
@@ -54,6 +55,21 @@ const Main = styled.main`
   background: ${({ theme }) => theme.colors.bg};
 `;
 
+const Spacer = styled.div`
+  flex: 1;
+`;
+
+const OfflineBadge = styled.div`
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #92400E;
+  background: #FEF3C7;
+  border-radius: 9999px;
+  padding: 2px 8px;
+  text-align: center;
+`;
+
 // SVG icons
 const IconChat = () => (
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -78,6 +94,8 @@ const IconSettings = () => (
 );
 
 function Layout({ children }) {
+  const isOnline = useOnline();
+
   return (
     <Wrapper>
       <Sidebar>
@@ -90,6 +108,8 @@ function Layout({ children }) {
         <NavItem to="/settings" title="Settings">
           <IconSettings />
         </NavItem>
+        <Spacer />
+        {!isOnline && <OfflineBadge>Offline</OfflineBadge>}
       </Sidebar>
       <Main>{children}</Main>
     </Wrapper>

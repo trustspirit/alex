@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import styled, { keyframes, css } from 'styled-components';
+import { useBridge } from '../../hooks/useBridge';
 
 const progressAnim = keyframes`
   from { opacity: 0.6; }
@@ -158,6 +159,54 @@ const Tooltip = styled.span`
   pointer-events: none;
 `;
 
+const TagRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+`;
+
+const TagPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  color: ${({ theme }) => theme.colors.primary};
+  background: rgba(37, 99, 235, 0.07);
+  border-radius: 9999px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(37, 99, 235, 0.14);
+  }
+`;
+
+const AddTagButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+  line-height: 1;
+  color: ${({ theme }) => theme.colors.textTertiary};
+  background: none;
+  border: 1px dashed ${({ theme }) => theme.colors.border};
+  border-radius: 9999px;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.1s, border-color 0.1s;
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.primary};
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
 const TrashIcon = () => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="2 4 14 4" />
@@ -201,13 +250,27 @@ function formatRelativeDate(dateStr) {
   return date.toLocaleDateString();
 }
 
-function DocumentCard({ doc, docProgress, docWarnings, onDelete, onReindex }) {
+function DocumentCard({ doc, docProgress, docWarnings, onDelete, onReindex, onTagsChanged }) {
+  const { call } = useBridge();
   const status = doc.status || 'pending';
   const pct = docProgress?.percent ?? 0;
   const hasWarning = doc.fallback_used || (docWarnings && docWarnings.length > 0);
   const warningMessage =
     docWarnings?.[0]?.warning ||
     (doc.fallback_used ? 'Fallback used during processing' : '');
+  const tags = doc.tags || [];
+
+  const handleAddTag = useCallback(async () => {
+    const name = window.prompt('Enter tag name:');
+    if (!name || !name.trim()) return;
+    await call('add_tag_to_document', doc.id, name.trim());
+    if (onTagsChanged) onTagsChanged();
+  }, [call, doc.id, onTagsChanged]);
+
+  const handleRemoveTag = useCallback(async (tagId) => {
+    await call('remove_tag_from_document', doc.id, tagId);
+    if (onTagsChanged) onTagsChanged();
+  }, [call, doc.id, onTagsChanged]);
 
   return (
     <Card>
@@ -242,6 +305,15 @@ function DocumentCard({ doc, docProgress, docWarnings, onDelete, onReindex }) {
           <TrashIcon />
         </DeleteButton>
       </CardTop>
+
+      <TagRow>
+        {tags.map((tag) => (
+          <TagPill key={tag.id} title="Click to remove" onClick={() => handleRemoveTag(tag.id)}>
+            {tag.name}
+          </TagPill>
+        ))}
+        <AddTagButton title="Add tag" onClick={handleAddTag}>+</AddTagButton>
+      </TagRow>
 
       <CardMeta>
         <SourceBadge $type={doc.source_type}>{doc.source_type || '—'}</SourceBadge>

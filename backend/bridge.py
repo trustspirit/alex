@@ -29,6 +29,7 @@ class BridgeAPI:
         chat_repo,
         settings_repo,
         provider_manager,
+        tag_repo=None,
     ) -> None:
         self._pipeline = pipeline
         self._query_engine = query_engine
@@ -37,6 +38,7 @@ class BridgeAPI:
         self._chat_repo = chat_repo
         self._settings_repo = settings_repo
         self._provider_manager = provider_manager
+        self._tag_repo = tag_repo
         self._window = None  # Set after window creation
 
     def set_window(self, window) -> None:
@@ -229,6 +231,7 @@ class BridgeAPI:
                     "fallback_warning": d.fallback_warning,
                     "created_at": d.created_at.isoformat() if d.created_at else None,
                     "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+                    "tags": [{"id": t.id, "name": t.name} for t in (d.tags or [])],
                 }
             )
         return result
@@ -346,6 +349,43 @@ class BridgeAPI:
         except Exception as exc:
             logger.warning("open_file_dialog failed: %s", exc)
             return None
+
+    # ------------------------------------------------------------------
+    # Tag API
+    # ------------------------------------------------------------------
+
+    def get_tags(self):
+        """Return all tags as JSON-serialisable dicts."""
+        if not self._tag_repo:
+            return []
+        tags = self._tag_repo.list_all()
+        return [{"id": t.id, "name": t.name} for t in tags]
+
+    def add_tag_to_document(self, doc_id, tag_name):
+        """Add a tag to a document (creates the tag if needed)."""
+        if self._tag_repo:
+            self._tag_repo.add_tag_to_document(doc_id, tag_name)
+        return {"success": True}
+
+    def remove_tag_from_document(self, doc_id, tag_id):
+        """Remove a tag from a document."""
+        if self._tag_repo:
+            self._tag_repo.remove_tag_from_document(doc_id, tag_id)
+        return {"success": True}
+
+    # ------------------------------------------------------------------
+    # Re-index all
+    # ------------------------------------------------------------------
+
+    def reindex_all_documents(self):
+        """Re-index all completed documents with new embedding model."""
+        docs = self._document_repo.list_all()
+        count = 0
+        for doc in docs:
+            if doc.status == "completed":
+                self.reindex_document(doc.id)
+                count += 1
+        return {"count": count, "status": "reindexing"}
 
     # ------------------------------------------------------------------
     # Aliases for frontend compatibility

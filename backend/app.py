@@ -16,6 +16,7 @@ from backend.storage.collection_repo import CollectionRepo
 from backend.storage.document_repo import DocumentRepo
 from backend.storage.chat_repo import ChatRepo
 from backend.storage.settings_repo import SettingsRepo
+from backend.storage.tag_repo import TagRepo
 from backend.llm.provider_manager import ProviderManager
 from backend.indexing.store import ChromaStore
 from backend.indexing.index_manager import IndexManager
@@ -60,6 +61,7 @@ def start_app() -> None:
     collection_repo = CollectionRepo(db_session)
     chat_repo = ChatRepo(db_session)
     settings_repo = SettingsRepo(db_session)
+    tag_repo = TagRepo(db_session)
 
     # ------------------------------------------------------------------
     # LLM provider manager
@@ -167,6 +169,7 @@ def start_app() -> None:
         chat_repo=chat_repo,
         settings_repo=settings_repo,
         provider_manager=provider_manager,
+        tag_repo=tag_repo,
     )
 
     # ------------------------------------------------------------------
