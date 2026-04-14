@@ -4,10 +4,10 @@ import theme from './styles/theme';
 import GlobalStyle from './styles/GlobalStyle';
 import Layout from './components/Layout';
 import SettingsPage from './pages/SettingsPage';
+import LearnPage from './pages/LearnPage';
 
 // Temporary placeholder pages
 const ChatPage = () => <div style={{ padding: '24px' }}>Chat Page — coming soon</div>;
-const LearnPage = () => <div style={{ padding: '24px' }}>Learn Page — coming soon</div>;
 
 function App() {
   return (
