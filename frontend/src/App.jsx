@@ -5,9 +5,7 @@ import GlobalStyle from './styles/GlobalStyle';
 import Layout from './components/Layout';
 import SettingsPage from './pages/SettingsPage';
 import LearnPage from './pages/LearnPage';
-
-// Temporary placeholder pages
-const ChatPage = () => <div style={{ padding: '24px' }}>Chat Page — coming soon</div>;
+import ChatPage from './pages/ChatPage';
 
 function App() {
   return (
