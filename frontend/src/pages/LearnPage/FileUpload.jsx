@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import styled, { css, keyframes } from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 
 const spin = keyframes`
   to { transform: rotate(360deg); }

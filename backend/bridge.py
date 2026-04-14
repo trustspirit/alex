@@ -329,6 +329,7 @@ class BridgeAPI:
                 "name": p.name,
                 "display_name": p.display_name,
                 "models": p.models,
+                "embed_models": p.embed_models,
             }
             for p in providers
         ]

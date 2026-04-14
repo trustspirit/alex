@@ -28,16 +28,39 @@ except Exception:
 # ---------------------------------------------------------------------------
 
 def _try_opendataloader(file_path: str) -> list:
-    """Attempt to load *file_path* using OpenDataLoader.
+    """Attempt to load *file_path* using OpenDataLoader PDF.
+
+    Converts the PDF to markdown via ``opendataloader_pdf.convert`` and wraps
+    the result in Document objects.
 
     Raises an exception if the library is not installed or if loading fails.
     """
     try:
-        import opendataloader  # type: ignore[import]
-        loader = opendataloader.OpenDataLoader()
-        return loader.load_data(file_path)
+        import opendataloader_pdf  # type: ignore[import]
+        import tempfile
+        from backend.ingestion.loaders.document import Document
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            opendataloader_pdf.convert(
+                input_path=[file_path],
+                output_dir=tmp_dir,
+                format="markdown",
+            )
+            # Read the generated markdown file
+            from pathlib import Path
+            md_files = list(Path(tmp_dir).glob("*.md"))
+            documents = []
+            for md_file in md_files:
+                text = md_file.read_text(encoding="utf-8")
+                documents.append(Document(
+                    text=text,
+                    metadata={"source": file_path, "type": "pdf", "method": "opendataloader"},
+                ))
+            if not documents:
+                raise RuntimeError("OpenDataLoader produced no output")
+            return documents
     except ImportError as exc:
-        raise ImportError("opendataloader is not installed") from exc
+        raise ImportError("opendataloader-pdf is not installed") from exc
 
 
 # ---------------------------------------------------------------------------

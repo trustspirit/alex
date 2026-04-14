@@ -71,33 +71,34 @@ const WarnIcon = () => (
   </svg>
 );
 
-function SourceCard({ source }) {
-  const {
-    document_name,
-    document_title,
-    page_number,
-    score,
-    has_warning,
-    warning_reason,
-  } = source;
+function getDisplayName(source) {
+  const path = source.source || '';
+  if (source.type === 'youtube') return path;
+  if (!path) return 'Unknown source';
+  const parts = path.split('/');
+  return parts[parts.length - 1] || path;
+}
 
-  const displayName = document_title || document_name || 'Unknown source';
+function SourceCard({ source }) {
+  const { page, score, fallback } = source;
+  const displayName = getDisplayName(source);
+  const hasWarning = Boolean(fallback);
   const scoreDisplay = typeof score === 'number' ? `${(score * 100).toFixed(0)}%` : null;
 
   return (
     <Card>
-      <SourceIcon $hasWarning={has_warning}>
+      <SourceIcon $hasWarning={hasWarning}>
         <DocIcon />
       </SourceIcon>
       <SourceBody>
         <SourceName title={displayName}>{displayName}</SourceName>
         <SourceMeta>
-          {page_number != null && <span>p. {page_number}</span>}
+          {page != null && <span>p. {page}</span>}
           {scoreDisplay && <span>Relevance {scoreDisplay}</span>}
-          {has_warning && (
-            <WarningBadge title={warning_reason || 'Low confidence source'}>
+          {hasWarning && (
+            <WarningBadge title="Parsed with fallback method">
               <WarnIcon />
-              {warning_reason || 'Low confidence'}
+              Fallback
             </WarningBadge>
           )}
         </SourceMeta>
