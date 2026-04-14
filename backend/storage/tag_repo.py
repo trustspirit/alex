@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
-
+from backend.storage.base_repo import BaseRepo
 from backend.storage.models import Document, Tag, document_tags
 
 
-class TagRepo:
-    def __init__(self, session: Session) -> None:
-        self._session = session
+class TagRepo(BaseRepo):
 
     def create(self, name: str) -> Tag:
         tag = Tag(name=name)

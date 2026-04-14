@@ -5,18 +5,14 @@ try:
 except ImportError:
     keyring = None  # type: ignore[assignment]
 
-from sqlalchemy.orm import Session
-
+from backend.storage.base_repo import BaseRepo
 from backend.storage.models import Setting
 
 KEYRING_SERVICE = "alex"
 _SECRET_MARKER = "__secret__"
 
 
-class SettingsRepo:
-    def __init__(self, session: Session) -> None:
-        self._session = session
-
+class SettingsRepo(BaseRepo):
     def get(self, key: str) -> str | None:
         setting = self._session.query(Setting).filter_by(key=key).first()
         if setting is None:

@@ -94,20 +94,27 @@ def test_load_falls_back_to_liteparse():
     def fail_opendataloader(file_path: str):
         raise Exception("OpenDataLoader unavailable")
 
-    mock_lite_parser_instance = MagicMock()
-    mock_lite_parser_instance.load_data.return_value = mock_docs
-    mock_lite_parser_cls = MagicMock(return_value=mock_lite_parser_instance)
+    # Mock LiteParse: parse() returns a ParseResult with pages
+    mock_page = MagicMock()
+    mock_page.text = "Fallback parsed content"
+    mock_parse_result = MagicMock()
+    mock_parse_result.num_pages = 1
+    mock_parse_result.get_page.return_value = mock_page
+
+    mock_liteparse_instance = MagicMock()
+    mock_liteparse_instance.parse.return_value = mock_parse_result
+    mock_liteparse_cls = MagicMock(return_value=mock_liteparse_instance)
 
     with patch("backend.ingestion.loaders.pdf_loader.LlamaParse", mock_llama_parse_cls), \
          patch("backend.ingestion.loaders.pdf_loader._try_opendataloader", side_effect=fail_opendataloader), \
-         patch("backend.ingestion.loaders.pdf_loader.LiteParser", mock_lite_parser_cls):
+         patch("backend.ingestion.loaders.pdf_loader._LiteParse", mock_liteparse_cls):
         loader = PdfLoader(llamaparse_api_key="test-key")
         result = loader.load("dummy.pdf")
 
     assert result.fallback_used is True
     assert result.fallback_warning is not None
     assert "기본 파서" in result.fallback_warning
-    assert result.documents == mock_docs
+    assert len(result.documents) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -121,11 +128,11 @@ def test_load_all_fail_raises():
     def fail_opendataloader(file_path: str):
         raise Exception("OpenDataLoader unavailable")
 
-    mock_lite_parser_cls = MagicMock(side_effect=Exception("LiteParse unavailable"))
+    mock_liteparse_cls = MagicMock(side_effect=Exception("LiteParse unavailable"))
 
     with patch("backend.ingestion.loaders.pdf_loader.LlamaParse", mock_llama_parse_cls), \
          patch("backend.ingestion.loaders.pdf_loader._try_opendataloader", side_effect=fail_opendataloader), \
-         patch("backend.ingestion.loaders.pdf_loader.LiteParser", mock_lite_parser_cls):
+         patch("backend.ingestion.loaders.pdf_loader._LiteParse", mock_liteparse_cls):
         loader = PdfLoader(llamaparse_api_key="test-key")
         with pytest.raises(RuntimeError):
             loader.load("dummy.pdf")

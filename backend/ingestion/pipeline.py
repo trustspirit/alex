@@ -145,9 +145,15 @@ class IngestionPipeline:
         int
             The doc_id created for this ingestion job.
         """
-        # Create document record synchronously so we can return the id right away
+        # Create document record synchronously so we can return the id right away.
+        # Use filename as initial title so it's never blank.
+        from pathlib import Path
+        initial_title = Path(source_path).stem.replace("_", " ").replace("-", " ").title()
+        if source_type == "youtube":
+            initial_title = source_path  # Show URL as title until metadata is extracted
+
         doc = self._doc_repo.create(
-            title="",
+            title=initial_title,
             source_type=source_type,
             source_path=source_path,
             collection_id=collection_id,
@@ -251,8 +257,14 @@ class IngestionPipeline:
             self._doc_repo.update_status(doc_id, "completed")
 
         except Exception as exc:
-            logger.error("Async ingestion failed for doc %s: %s", doc_id, exc)
-            self._doc_repo.update_status(doc_id, "failed")
+            logger.error("Async ingestion failed for doc %s: %s", doc_id, exc, exc_info=True)
+            try:
+                self._doc_repo.update_status(doc_id, "failed")
+                self._doc_repo.set_fallback(
+                    doc_id, f"Processing failed: {exc}"
+                )
+            except Exception:
+                logger.error("Could not update failed status for doc %s", doc_id)
 
     def _load(self, source_path: str, source_type: str):
         """Route source_path to the correct loader based on source_type."""

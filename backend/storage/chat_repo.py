@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
-
+from backend.storage.base_repo import BaseRepo
 from backend.storage.models import ChatMessage, ChatSession
 
 
-class ChatRepo:
-    def __init__(self, session: Session) -> None:
-        self._session = session
+class ChatRepo(BaseRepo):
 
     def create_session(self, title: str = "New Chat") -> ChatSession:
         chat_session = ChatSession(title=title)

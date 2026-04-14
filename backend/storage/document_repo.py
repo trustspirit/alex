@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
 
+from backend.storage.base_repo import BaseRepo
 from backend.storage.models import Document
 
 
-class DocumentRepo:
-    def __init__(self, session: Session) -> None:
-        self._session = session
+class DocumentRepo(BaseRepo):
 
     def create(
         self,

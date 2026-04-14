@@ -55,13 +55,14 @@ def start_app() -> None:
     engine = get_engine(DATA_DIR)
     init_db(engine)
     ScopedSession = get_scoped_session_factory(engine)
-    db_session = ScopedSession()
 
-    document_repo = DocumentRepo(db_session)
-    collection_repo = CollectionRepo(db_session)
-    chat_repo = ChatRepo(db_session)
-    settings_repo = SettingsRepo(db_session)
-    tag_repo = TagRepo(db_session)
+    # Pass the scoped session factory — each call to ScopedSession()
+    # returns the thread-local session, so repos are thread-safe.
+    document_repo = DocumentRepo(ScopedSession)
+    collection_repo = CollectionRepo(ScopedSession)
+    chat_repo = ChatRepo(ScopedSession)
+    settings_repo = SettingsRepo(ScopedSession)
+    tag_repo = TagRepo(ScopedSession)
 
     # ------------------------------------------------------------------
     # LLM provider manager

@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
-
+from backend.storage.base_repo import BaseRepo
 from backend.storage.models import Collection
 
 
-class CollectionRepo:
-    def __init__(self, session: Session) -> None:
-        self._session = session
+class CollectionRepo(BaseRepo):
 
     def create(self, name: str, description: str = "") -> Collection:
         coll = Collection(name=name, description=description)

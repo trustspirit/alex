@@ -12,14 +12,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 try:
-    from llama_cloud import LlamaParse
+    from llama_parse import LlamaParse
 except Exception:  # ImportError or any install-time error
     LlamaParse = None  # type: ignore[assignment,misc]
 
 try:
-    from liteparse import LiteParser
+    from liteparse import LiteParse as _LiteParse
 except Exception:
-    LiteParser = None  # type: ignore[assignment,misc]
+    _LiteParse = None  # type: ignore[assignment,misc]
 
 
 # ---------------------------------------------------------------------------
@@ -151,10 +151,28 @@ class PdfLoader:
         return parser.load_data(file_path)
 
     def _load_liteparse(self, file_path: str) -> list:
-        if LiteParser is None:
+        if _LiteParse is None:
             raise ImportError("liteparse is not installed")
-        parser = LiteParser()
-        return parser.load_data(file_path)
+        from backend.ingestion.loaders.document import Document
+
+        parser = _LiteParse()
+        result = parser.parse(file_path)
+        documents = []
+        for page in range(result.num_pages):
+            parsed_page = result.get_page(page)
+            if parsed_page.text.strip():
+                documents.append(Document(
+                    text=parsed_page.text,
+                    metadata={
+                        "source": file_path,
+                        "type": "pdf",
+                        "method": "liteparse",
+                        "page_label": str(page + 1),
+                    },
+                ))
+        if not documents:
+            raise RuntimeError("LiteParse produced no output")
+        return documents
 
     def _detect_structure(self, documents: list) -> bool:
         """Check if parsed markdown contains heading markers."""
