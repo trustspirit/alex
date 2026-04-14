@@ -175,6 +175,8 @@ const Bubble = styled.div`
   font-size: ${({ theme }) => theme.fontSizes.md};
   line-height: 1.6;
   color: ${({ $isError, theme }) => ($isError ? theme.colors.error : theme.colors.text)};
+  user-select: text;
+  cursor: text;
 
   p + p,
   p + ul,

@@ -163,7 +163,10 @@ class IndexManager:
                 "Single index available (%s); returning its query engine directly.",
                 kind,
             )
-            return index.as_query_engine()
+            return index.as_query_engine(
+                embed_model=self._embed_model,
+                llm=self._llm,
+            )
 
         # Two indexes: build QueryEngineTool wrappers and compose via RouterQueryEngine
         logger.info(
@@ -172,7 +175,10 @@ class IndexManager:
         )
         tools: list = []
 
-        vector_qe = self._vector_index.as_query_engine()
+        vector_qe = self._vector_index.as_query_engine(
+            embed_model=self._embed_model,
+            llm=self._llm,
+        )
         tools.append(
             QueryEngineTool(
                 query_engine=vector_qe,
@@ -183,7 +189,10 @@ class IndexManager:
             )
         )
 
-        summary_qe = self._summary_index.as_query_engine()
+        summary_qe = self._summary_index.as_query_engine(
+            embed_model=self._embed_model,
+            llm=self._llm,
+        )
         tools.append(
             QueryEngineTool(
                 query_engine=summary_qe,
