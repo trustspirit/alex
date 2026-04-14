@@ -86,7 +86,7 @@ class Chunker:
         Uses ``HierarchicalNodeParser`` with the configured ``chunk_sizes``
         to create a large/medium/small node hierarchy.
         """
-        parser = HierarchicalNodeParser(chunk_sizes=self._chunk_sizes)
+        parser = HierarchicalNodeParser.from_defaults(chunk_sizes=self._chunk_sizes)
         nodes = parser.get_nodes_from_documents(documents)
         logger.info(
             "Hierarchical chunking produced %d nodes (chunk_sizes=%s)",

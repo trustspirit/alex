@@ -54,13 +54,14 @@ def test_structured_document_uses_hierarchical():
 
     mock_parser_instance = MagicMock()
     mock_parser_instance.get_nodes_from_documents.return_value = mock_nodes
-    mock_parser_cls = MagicMock(return_value=mock_parser_instance)
+    mock_parser_cls = MagicMock()
+    mock_parser_cls.from_defaults.return_value = mock_parser_instance
 
     with patch("backend.ingestion.chunker.HierarchicalNodeParser", mock_parser_cls):
         chunker = Chunker(chunk_sizes=[1024, 512, 256])
         result = chunker.chunk(documents=docs, has_structure=True)
 
-    mock_parser_cls.assert_called_once()
+    mock_parser_cls.from_defaults.assert_called_once()
     mock_parser_instance.get_nodes_from_documents.assert_called_once_with(docs)
     assert result == mock_nodes
 
@@ -72,15 +73,15 @@ def test_structured_document_passes_chunk_sizes():
 
     mock_parser_instance = MagicMock()
     mock_parser_instance.get_nodes_from_documents.return_value = mock_nodes
-    mock_parser_cls = MagicMock(return_value=mock_parser_instance)
+    mock_parser_cls = MagicMock()
+    mock_parser_cls.from_defaults.return_value = mock_parser_instance
 
     custom_sizes = [2048, 1024, 512]
     with patch("backend.ingestion.chunker.HierarchicalNodeParser", mock_parser_cls):
         chunker = Chunker(chunk_sizes=custom_sizes)
         chunker.chunk(documents=docs, has_structure=True)
 
-    # Verify chunk_sizes were passed to the constructor
-    call_kwargs = mock_parser_cls.call_args
+    call_kwargs = mock_parser_cls.from_defaults.call_args
     assert call_kwargs is not None
     # chunk_sizes may be passed as positional or keyword argument
     args, kwargs = call_kwargs
