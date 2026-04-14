@@ -3,6 +3,7 @@ import { useLearn } from '../../hooks/useLearn';
 import CollectionSidebar from './CollectionSidebar';
 import FileUpload from './FileUpload';
 import DocumentList from './DocumentList';
+import Toast from '../../components/Toast';
 
 const PageWrapper = styled.div`
   display: flex;
@@ -67,6 +68,8 @@ function LearnPage() {
     isUploading,
     progress,
     warnings,
+    errors,
+    dismissError,
     uploadFiles,
     uploadYoutube,
     deleteDocument,
@@ -125,6 +128,18 @@ function LearnPage() {
           </section>
         </MainContent>
       </MainArea>
+
+      <Toast
+        toasts={[
+          ...warnings.map((w) => ({ type: 'warning', message: w.warning, id: w.id })),
+          ...errors.map((e) => ({ type: 'error', message: `Ingestion failed: ${e.error}`, id: e.id })),
+        ]}
+        onDismiss={(idx) => {
+          const all = [...warnings, ...errors];
+          const item = all[idx];
+          if (item && item.error) dismissError(item.id);
+        }}
+      />
     </PageWrapper>
   );
 }

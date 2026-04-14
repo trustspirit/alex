@@ -188,7 +188,8 @@ class BridgeAPI:
         source_type: str,
         collection_id: int | None = None,
     ) -> dict:
-        """Start async document ingestion; push progress/warnings via JS callbacks."""
+        """Start async document ingestion; push progress/warnings/errors via JS callbacks."""
+        logger.info("ingest_document called: path=%s type=%s", source_path, source_type)
 
         def _on_progress(doc_id: int, step: str, percent: int) -> None:
             self._push_js(
@@ -202,14 +203,26 @@ class BridgeAPI:
                 {"doc_id": doc_id, "warning": warning},
             )
 
-        doc_id = self._pipeline.ingest_async(
-            source_path=source_path,
-            source_type=source_type,
-            collection_id=collection_id,
-            on_progress=_on_progress,
-            on_warning=_on_warning,
-        )
-        return {"doc_id": doc_id, "status": "processing"}
+        def _on_error(doc_id: int, error: str) -> None:
+            self._push_js(
+                "onIngestError",
+                {"doc_id": doc_id, "error": error},
+            )
+
+        try:
+            doc_id = self._pipeline.ingest_async(
+                source_path=source_path,
+                source_type=source_type,
+                collection_id=collection_id,
+                on_progress=_on_progress,
+                on_warning=_on_warning,
+                on_error=_on_error,
+            )
+            return {"doc_id": doc_id, "status": "processing"}
+        except Exception as exc:
+            logger.error("ingest_document failed synchronously: %s", exc, exc_info=True)
+            self._push_js("onIngestError", {"doc_id": -1, "error": str(exc)})
+            return {"error": str(exc)}
 
     def get_documents(self, collection_id: int | None = None) -> list[dict]:
         """Return documents, optionally filtered by *collection_id*."""

@@ -16,7 +16,7 @@ function isYoutubeUrl(url) {
 
 export function useLearn() {
   const { call } = useBridge();
-  const { progress, warnings, dismissWarning } = useProgress();
+  const { progress, warnings, errors, dismissWarning, dismissError } = useProgress();
 
   const [documents, setDocuments] = useState([]);
   const [collections, setCollections] = useState([]);
@@ -182,7 +182,9 @@ export function useLearn() {
     isUploading,
     progress,
     warnings,
+    errors,
     dismissWarning,
+    dismissError,
     uploadFiles,
     uploadYoutube,
     deleteDocument,

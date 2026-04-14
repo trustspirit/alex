@@ -137,6 +137,7 @@ class IngestionPipeline:
         tags: list | None = None,
         on_progress: Callable | None = None,
         on_warning: Callable | None = None,
+        on_error: Callable | None = None,
     ) -> int:
         """Start ingestion in a background thread and return doc_id immediately.
 
@@ -163,7 +164,7 @@ class IngestionPipeline:
         thread = threading.Thread(
             target=self._run_ingestion,
             args=(doc_id, source_path, source_type, collection_id, tags,
-                  on_progress, on_warning),
+                  on_progress, on_warning, on_error),
             daemon=True,
         )
         thread.start()
@@ -201,11 +202,14 @@ class IngestionPipeline:
         tags: list | None,
         on_progress: Callable | None = None,
         on_warning: Callable | None = None,
+        on_error: Callable | None = None,
     ) -> None:
         """Background-thread ingestion body (doc already created)."""
+        logger.info("_run_ingestion started: doc_id=%s path=%s type=%s", doc_id, source_path, source_type)
         # Use per-invocation callbacks if provided, else fall back to instance-level
         progress_cb = on_progress or self._on_progress
         warning_cb = on_warning or self._on_warning
+        error_cb = on_error
 
         try:
             self._doc_repo.update_status(doc_id, "processing")
@@ -265,6 +269,12 @@ class IngestionPipeline:
                 )
             except Exception:
                 logger.error("Could not update failed status for doc %s", doc_id)
+            # Push error to frontend
+            if error_cb:
+                try:
+                    error_cb(doc_id, str(exc))
+                except Exception:
+                    pass
 
     def _load(self, source_path: str, source_type: str):
         """Route source_path to the correct loader based on source_type."""
