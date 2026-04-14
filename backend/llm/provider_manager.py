@@ -53,9 +53,9 @@ PROVIDERS: dict[str, LLMProvider] = {
 }
 
 LLM_CONSTRUCTORS = {
-    "openai": lambda model, api_key: OpenAI(model=model, api_key=api_key),
-    "anthropic": lambda model, api_key: Anthropic(model=model, api_key=api_key),
-    "gemini": lambda model, api_key: Gemini(model=model, api_key=api_key),
+    "openai": lambda model, api_key: OpenAI(model=model, api_key=api_key, max_tokens=4096),
+    "anthropic": lambda model, api_key: Anthropic(model=model, api_key=api_key, max_tokens=4096),
+    "gemini": lambda model, api_key: Gemini(model=model, api_key=api_key, max_tokens=4096),
 }
 
 
