@@ -118,13 +118,13 @@ const IconCheck = () => (
   </svg>
 );
 
-function ApiKeyForm({ provider, savingStatus, onSave }) {
+function ApiKeyForm({ provider, savingStatus, onSave, hasExistingKey }) {
   const [value, setValue] = useState('');
   const [visible, setVisible] = useState(false);
   const [touched, setTouched] = useState(false);
 
   const isEmpty = value.trim() === '';
-  const showError = touched && isEmpty;
+  const showError = touched && isEmpty && !hasExistingKey;
   const isSaved = savingStatus === 'saved';
   const isSaving = savingStatus === 'saving';
 
@@ -149,7 +149,7 @@ function ApiKeyForm({ provider, savingStatus, onSave }) {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onBlur={() => setTouched(true)}
-            placeholder={`Enter ${provider.display_name} API key`}
+            placeholder={hasExistingKey ? '••••••••  (key saved)' : `Enter ${provider.display_name} API key`}
             autoComplete="off"
             spellCheck={false}
           />

@@ -96,6 +96,7 @@ function SettingsPage() {
                   provider={provider}
                   savingStatus={saving[`apiKey_${provider.name}`]}
                   onSave={saveApiKey}
+                  hasExistingKey={settings[`${provider.name}_api_key`] === '__secret__'}
                 />
               </div>
             ))}
