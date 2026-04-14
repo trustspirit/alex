@@ -48,11 +48,27 @@ export function useLearn() {
 
   const uploadFiles = useCallback(
     async (files) => {
+      // Browser File API doesn't provide full paths in PyWebView.
+      // If files have no path, use the native file dialog instead.
+      let filePaths = [];
+      if (files && files.length > 0 && files[0].path) {
+        // Electron-style: files already have full paths
+        filePaths = files.map((f) => ({ path: f.path, name: f.name }));
+      } else {
+        // PyWebView: use native file dialog to get real paths
+        const result = await call('open_file_dialog');
+        if (!result || result.length === 0) return;
+        filePaths = result.map((p) => {
+          const name = p.split('/').pop() || p;
+          return { path: p, name };
+        });
+      }
+
       setIsUploading(true);
       try {
-        for (const file of files) {
+        for (const file of filePaths) {
           const sourceType = detectSourceType(file.name);
-          await call('ingest_document', file.path || file.name, sourceType, selectedCollection);
+          await call('ingest_document', file.path, sourceType, selectedCollection);
         }
         await refreshDocuments();
       } catch (err) {
