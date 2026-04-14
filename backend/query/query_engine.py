@@ -14,22 +14,23 @@ except ImportError:
     PromptTemplate = None
 
 QA_PROMPT_TMPL = (
-    "You are a knowledgeable assistant. Use the provided context to answer the question.\n"
+    "You are a document-based assistant. Answer ONLY based on the provided context below.\n"
     "\n"
-    "Rules:\n"
+    "STRICT RULES:\n"
+    "- ONLY use information from the context below. Do NOT use your own knowledge or training data.\n"
+    "- If the answer is not in the context, say: \"제공된 문서에서 해당 정보를 찾을 수 없습니다.\"\n"
     "- Answer in the SAME LANGUAGE as the question. If the question is in Korean, answer in Korean.\n"
     "- Provide detailed, thorough answers. Include names, dates, places, and specific details from the context.\n"
     "- Do not give one-word or one-phrase answers. Explain with full sentences.\n"
-    "- If the context contains relevant details, include them all in your answer.\n"
-    "- If you don't know, say so honestly.\n"
+    "- When citing information, mention which part of the context it comes from.\n"
     "\n"
-    "Context:\n"
+    "Context from uploaded documents:\n"
     "-----\n"
     "{context_str}\n"
     "-----\n"
     "\n"
     "Question: {query_str}\n"
-    "Answer: "
+    "Answer (based only on the context above): "
 )
 
 
