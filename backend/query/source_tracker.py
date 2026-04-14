@@ -32,17 +32,16 @@ class SourceTracker:
             One dict per source node with keys:
             ``source``, ``type``, ``page``, ``score``, ``fallback``.
         """
-        sources: list[dict] = []
+        raw: list[dict] = []
         for node_with_score in response.source_nodes:
             metadata = node_with_score.node.metadata
-            # Page number can be stored under different keys depending on the loader
             page = (
                 metadata.get("page_label")
                 or metadata.get("page")
                 or metadata.get("page_number")
             )
 
-            sources.append(
+            raw.append(
                 {
                     "source": metadata.get("source", ""),
                     "type": metadata.get("type", ""),
@@ -51,7 +50,16 @@ class SourceTracker:
                     "fallback": bool(metadata.get("fallback", False)),
                 }
             )
-        logger.debug("Extracted %d sources from response.", len(sources))
+
+        # Deduplicate by (source, page) — keep highest score
+        seen: dict[tuple, dict] = {}
+        for s in raw:
+            key = (s["source"], s["page"])
+            if key not in seen or (s["score"] or 0) > (seen[key]["score"] or 0):
+                seen[key] = s
+
+        sources = list(seen.values())
+        logger.debug("Extracted %d sources (%d after dedup).", len(raw), len(sources))
         return sources
 
     def format_for_display(self, sources: list[dict]) -> list[dict]:
