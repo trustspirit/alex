@@ -8,6 +8,30 @@ from backend.query.source_tracker import SourceTracker
 
 logger = logging.getLogger(__name__)
 
+try:
+    from llama_index.core import PromptTemplate
+except ImportError:
+    PromptTemplate = None
+
+QA_PROMPT_TMPL = (
+    "You are a knowledgeable assistant. Use the provided context to answer the question.\n"
+    "\n"
+    "Rules:\n"
+    "- Answer in the SAME LANGUAGE as the question. If the question is in Korean, answer in Korean.\n"
+    "- Provide detailed, thorough answers. Include names, dates, places, and specific details from the context.\n"
+    "- Do not give one-word or one-phrase answers. Explain with full sentences.\n"
+    "- If the context contains relevant details, include them all in your answer.\n"
+    "- If you don't know, say so honestly.\n"
+    "\n"
+    "Context:\n"
+    "-----\n"
+    "{context_str}\n"
+    "-----\n"
+    "\n"
+    "Question: {query_str}\n"
+    "Answer: "
+)
+
 
 class QueryEngine:
     """High-level query engine that combines hybrid routing with LlamaIndex querying.
@@ -91,9 +115,24 @@ class QueryEngine:
     # Private query methods
     # ------------------------------------------------------------------
 
+    def _get_qa_prompt(self):
+        """Return a custom QA prompt template if available."""
+        if PromptTemplate is not None:
+            return PromptTemplate(QA_PROMPT_TMPL)
+        return None
+
     def _query_rag(self, question: str, mode: str) -> dict:
         """Standard RAG query via the index."""
         engine = self._index_manager.get_query_engine()
+
+        # Apply custom QA prompt for detailed, language-matching answers
+        qa_prompt = self._get_qa_prompt()
+        if qa_prompt:
+            try:
+                engine.update_prompts({"response_synthesizer:text_qa_template": qa_prompt})
+            except Exception:
+                pass  # Not all engines support update_prompts
+
         response = with_retry(lambda: engine.query(question))
 
         sources = self._source_tracker.extract(response)
@@ -107,14 +146,20 @@ class QueryEngine:
     def _query_full_context(self, question: str, collection_id: int | None) -> dict:
         """Full-context mode: retrieve as much context as possible."""
         try:
-            # Get a query engine with high top_k to approximate full context
             if self._index_manager._vector_index:
                 engine = self._index_manager._vector_index.as_query_engine(
                     llm=self._index_manager._llm,
-                    similarity_top_k=50,  # Retrieve many chunks for small collections
+                    similarity_top_k=50,
                 )
             else:
                 engine = self._index_manager.get_query_engine()
+
+            qa_prompt = self._get_qa_prompt()
+            if qa_prompt:
+                try:
+                    engine.update_prompts({"response_synthesizer:text_qa_template": qa_prompt})
+                except Exception:
+                    pass
 
             response = with_retry(lambda: engine.query(question))
 
