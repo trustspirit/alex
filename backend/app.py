@@ -159,14 +159,12 @@ def start_app() -> None:
     # ------------------------------------------------------------------
 
     # Define sync callback (sync_manager may be set later, so use closure)
+    from concurrent.futures import ThreadPoolExecutor
+    _sync_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="sync-push")
+
     def _on_sync(doc_id):
         if sync_manager:
-            import threading
-            threading.Thread(
-                target=sync_manager.push_document,
-                args=(doc_id,),
-                daemon=True,
-            ).start()
+            _sync_executor.submit(sync_manager.push_document, doc_id)
 
     pipeline = IngestionPipeline(
         document_repo=document_repo,

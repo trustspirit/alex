@@ -1,6 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useBridge } from './useBridge';
 
+// Module-level state to share across all useSync instances
+let globalCallbacksRegistered = false;
+const listeners = new Set();
+
+function notifyListeners(type, data) {
+  listeners.forEach((listener) => listener(type, data));
+}
+
+function registerGlobalCallbacks() {
+  if (globalCallbacksRegistered) return;
+  globalCallbacksRegistered = true;
+
+  if (!window.__bridge__) window.__bridge__ = {};
+
+  window.__bridge__.onSyncStart = () => notifyListeners('start', {});
+  window.__bridge__.onSyncComplete = (data) => {
+    notifyListeners('complete', data);
+    window.dispatchEvent(new CustomEvent('alex-sync-complete', { detail: data }));
+  };
+  window.__bridge__.onSyncError = (error) => {
+    notifyListeners('error', error);
+    if (error && error.doc_id) {
+      window.dispatchEvent(new CustomEvent('alex-sync-doc-error', {
+        detail: { doc_id: error.doc_id, message: error.message },
+      }));
+    }
+  };
+}
+
 export function useSync() {
   const { call } = useBridge();
   const [syncStatus, setSyncStatus] = useState('disabled');
@@ -14,29 +43,23 @@ export function useSync() {
       }
     });
 
-    if (!window.__bridge__) window.__bridge__ = {};
+    registerGlobalCallbacks();
 
-    window.__bridge__.onSyncStart = () => {
-      setSyncStatus('syncing');
-      setSyncError(null);
-    };
-
-    window.__bridge__.onSyncComplete = (data) => {
-      setSyncStatus('idle');
-      setLastSyncedAt(new Date().toISOString());
-      window.dispatchEvent(new CustomEvent('alex-sync-complete', { detail: data }));
-    };
-
-    window.__bridge__.onSyncError = (error) => {
-      setSyncStatus('error');
-      setSyncError(error);
-
-      if (error && error.doc_id) {
-        window.dispatchEvent(new CustomEvent('alex-sync-doc-error', {
-          detail: { doc_id: error.doc_id, message: error.message },
-        }));
+    const listener = (type, data) => {
+      if (type === 'start') {
+        setSyncStatus('syncing');
+        setSyncError(null);
+      } else if (type === 'complete') {
+        setSyncStatus('idle');
+        setLastSyncedAt(new Date().toISOString());
+      } else if (type === 'error') {
+        setSyncStatus('error');
+        setSyncError(data);
       }
     };
+
+    listeners.add(listener);
+    return () => listeners.delete(listener);
   }, [call]);
 
   const triggerSync = useCallback(() => {

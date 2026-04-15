@@ -51,18 +51,19 @@ def test_delete_object(r2_client, mock_boto3_client):
 
 
 def test_list_objects_with_prefix(r2_client, mock_boto3_client):
-    mock_boto3_client.list_objects_v2.return_value = {
-        "Contents": [
-            {"Key": "documents/a.json.gz"},
-            {"Key": "documents/b.json.gz"},
-        ]
-    }
+    mock_paginator = MagicMock()
+    mock_paginator.paginate.return_value = [
+        {"Contents": [{"Key": "documents/a.json.gz"}, {"Key": "documents/b.json.gz"}]},
+    ]
+    mock_boto3_client.get_paginator.return_value = mock_paginator
     result = r2_client.list_objects("documents/")
     assert result == ["documents/a.json.gz", "documents/b.json.gz"]
 
 
 def test_list_objects_empty(r2_client, mock_boto3_client):
-    mock_boto3_client.list_objects_v2.return_value = {}
+    mock_paginator = MagicMock()
+    mock_paginator.paginate.return_value = [{}]
+    mock_boto3_client.get_paginator.return_value = mock_paginator
     result = r2_client.list_objects("documents/")
     assert result == []
 

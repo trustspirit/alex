@@ -476,10 +476,44 @@ class BridgeAPI:
             "status": "disabled" if not enabled else "idle",
         }
 
+    def initialize_sync(self) -> dict:
+        """Create SyncManager at runtime (after R2 credentials are saved)."""
+        try:
+            from backend.sync.r2_client import R2Client
+            from backend.sync.sync_manager import SyncManager
+
+            r2_endpoint = self._settings_repo.get("r2_endpoint")
+            r2_bucket = self._settings_repo.get("r2_bucket")
+            r2_access_key = self._settings_repo.get_secret("r2_access_key_id_api_key")
+            r2_secret_key = self._settings_repo.get_secret("r2_secret_access_key_api_key")
+
+            if not all([r2_endpoint, r2_bucket, r2_access_key, r2_secret_key]):
+                return {"success": False, "error": "Missing R2 credentials"}
+
+            r2_client = R2Client(
+                endpoint=r2_endpoint,
+                access_key_id=r2_access_key,
+                secret_access_key=r2_secret_key,
+                bucket=r2_bucket,
+            )
+            self._sync_manager = SyncManager(
+                r2_client=r2_client,
+                document_repo=self._document_repo,
+                collection_repo=self._collection_repo,
+                tag_repo=self._tag_repo,
+                chroma_store=self._chroma_store,
+                settings_repo=self._settings_repo,
+            )
+            return {"success": True}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
     def test_sync_connection(self) -> dict:
         """Test R2 connection."""
         if not self._sync_manager:
-            return {"success": False, "error": "Sync not configured"}
+            init_result = self.initialize_sync()
+            if not init_result.get("success"):
+                return {"success": False, "error": init_result.get("error", "Sync not configured")}
         try:
             result = self._sync_manager._r2.test_connection()
             return {"success": result}
@@ -490,6 +524,8 @@ class BridgeAPI:
         """Manually trigger full sync."""
         if not self._sync_manager:
             return {"error": "Sync not configured"}
+        if self._sync_manager._syncing:
+            return {"status": "already_syncing"}
 
         def _run():
             self._push_js("onSyncStart", {})

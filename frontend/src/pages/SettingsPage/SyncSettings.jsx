@@ -112,7 +112,7 @@ export default function SyncSettings({ settings, onSaveSetting, onSaveApiKey }) 
 
   const enabled = settings.sync_enabled === 'true';
   const hasExistingKeys = settings.r2_access_key_id_api_key || settings.r2_access_key_id;
-  const allFieldsFilled = endpoint && bucket && (accessKey || hasExistingKeys);
+  const allFieldsFilled = endpoint && bucket && (accessKey || hasExistingKeys) && (secretKey || hasExistingKeys);
 
   const handleTestConnection = async () => {
     setTesting(true);

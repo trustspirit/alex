@@ -38,9 +38,12 @@ class R2Client:
         logger.info("Deleted %s", key)
 
     def list_objects(self, prefix: str) -> list[str]:
-        response = self._client.list_objects_v2(Bucket=self._bucket, Prefix=prefix)
-        contents = response.get("Contents", [])
-        return [obj["Key"] for obj in contents]
+        paginator = self._client.get_paginator("list_objects_v2")
+        keys = []
+        for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                keys.append(obj["Key"])
+        return keys
 
     def test_connection(self) -> bool:
         try:

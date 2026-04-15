@@ -35,6 +35,8 @@ class SyncManager:
         self._settings_repo = settings_repo
         self._manifest = Manifest()
         self._lock = threading.RLock()
+        self._syncing = False
+        self._batch_mode = False
 
     def push_document(self, doc_id: int) -> None:
         """Push a single document (metadata + vectors) to R2."""
@@ -90,12 +92,19 @@ class SyncManager:
             key = f"{DOCUMENTS_PREFIX}{doc_id}.json.gz"
             self._r2.upload(key, payload)
 
-            with self._lock:
-                self._manifest.add_document(str(doc_id), {
-                    "title": doc.title,
-                    "source_type": doc.source_type,
-                })
-                self._upload_manifest()
+            if not self._batch_mode:
+                with self._lock:
+                    self._manifest.add_document(str(doc_id), {
+                        "title": doc.title,
+                        "source_type": doc.source_type,
+                    })
+                    self._upload_manifest()
+            else:
+                with self._lock:
+                    self._manifest.add_document(str(doc_id), {
+                        "title": doc.title,
+                        "source_type": doc.source_type,
+                    })
 
             self._doc_repo.set_sync_status(doc_id, "synced")
 
@@ -225,23 +234,48 @@ class SyncManager:
 
     def full_sync(self, on_complete=None, on_error=None) -> None:
         """Full sync: pull then push unsynced local docs."""
-        with self._lock:
+        if self._syncing:
+            logger.info("full_sync already in progress, skipping")
+            return
+        self._syncing = True
+        try:
             pull_result = {"added": 0, "deleted": 0}
 
             def _capture_pull_result(data):
                 pull_result.update(data)
 
-            self.pull(on_complete=_capture_pull_result, on_error=on_error)
+            pull_ok = True
+
+            def _on_pull_error(data):
+                nonlocal pull_ok
+                pull_ok = False
+                if on_error:
+                    on_error(data)
+
+            self.pull(on_complete=_capture_pull_result, on_error=_on_pull_error)
+
+            if not pull_ok:
+                return
 
             pushed = 0
             local_docs = self._doc_repo.list_all()
-            for doc in local_docs:
-                if doc.status == "completed" and doc.synced_at is None:
-                    self.push_document(doc.id)
-                    pushed += 1
+
+            self._batch_mode = True
+            try:
+                for doc in local_docs:
+                    if doc.status == "completed" and doc.synced_at is None:
+                        self.push_document(doc.id)
+                        pushed += 1
+            finally:
+                self._batch_mode = False
+
+            with self._lock:
+                self._upload_manifest()
 
             if on_complete:
                 on_complete({"added": pull_result["added"], "deleted": pull_result["deleted"], "pushed": pushed})
+        finally:
+            self._syncing = False
 
     def _upload_manifest(self) -> None:
         try:
@@ -274,7 +308,8 @@ class SyncManager:
                     collection_id = c.id
                     break
 
-        sync_source_path = f"sync://{doc_id}"
+        original_filename = meta.get("source_path", doc_id)
+        sync_source_path = f"sync://{doc_id}/{original_filename}"
         doc = self._doc_repo.create(
             title=meta["title"],
             source_type=meta["source_type"],
@@ -286,6 +321,8 @@ class SyncManager:
         try:
             if vectors.get("ids"):
                 chroma_coll = self._chroma.get_or_create_collection("default")
+                # Prefix vector IDs to avoid collision with local vectors
+                prefixed_ids = [f"sync_{doc_id}_{vid}" for vid in vectors["ids"]]
                 remapped_metadatas = []
                 for m in vectors.get("metadatas", []):
                     rm = dict(m)
@@ -293,7 +330,7 @@ class SyncManager:
                     remapped_metadatas.append(rm)
 
                 chroma_coll.upsert(
-                    ids=vectors["ids"],
+                    ids=prefixed_ids,
                     embeddings=vectors.get("embeddings"),
                     metadatas=remapped_metadatas,
                     documents=vectors.get("documents"),
@@ -302,6 +339,13 @@ class SyncManager:
             if self._tag_repo and meta.get("tags"):
                 for tag_name in meta["tags"]:
                     self._tag_repo.add_tag_to_document(doc.id, tag_name)
+
+            # Register in manifest so other devices see this device has the doc
+            with self._lock:
+                self._manifest.add_document(str(doc.id), {
+                    "title": meta["title"],
+                    "source_type": meta["source_type"],
+                })
 
             self._doc_repo.set_sync_status(doc.id, "synced")
 

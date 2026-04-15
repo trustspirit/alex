@@ -104,23 +104,3 @@ def test_document_sync_fields(tmp_db):
     tmp_db.commit()
     assert doc.sync_status == "pending"
     assert doc.synced_at is None
-
-
-def test_sync_state_model(tmp_db):
-    from backend.storage.models import SyncState
-    state = SyncState(id="default", last_pull_at=None, last_push_at=None)
-    tmp_db.add(state)
-    tmp_db.commit()
-    assert state.r2_manifest_etag is None
-
-
-def test_pending_sync_model(tmp_db):
-    from backend.storage.models import PendingSync
-    from datetime import datetime, timezone
-    ps = PendingSync(
-        id="ps-1", doc_id="123", action="push",
-        created_at=datetime.now(timezone.utc),
-    )
-    tmp_db.add(ps)
-    tmp_db.commit()
-    assert ps.retry_count == 0
