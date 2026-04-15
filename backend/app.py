@@ -157,12 +157,24 @@ def start_app() -> None:
     # ------------------------------------------------------------------
     # Ingestion pipeline
     # ------------------------------------------------------------------
+
+    # Define sync callback (sync_manager may be set later, so use closure)
+    def _on_sync(doc_id):
+        if sync_manager:
+            import threading
+            threading.Thread(
+                target=sync_manager.push_document,
+                args=(doc_id,),
+                daemon=True,
+            ).start()
+
     pipeline = IngestionPipeline(
         document_repo=document_repo,
         index_manager=index_manager,
         llm=llm,
         embed_model=embed_model,
         settings_repo=settings_repo,
+        on_sync=_on_sync,
     )
 
     # ------------------------------------------------------------------
@@ -174,6 +186,41 @@ def start_app() -> None:
         document_repo=document_repo,
         settings_repo=settings_repo,
     )
+
+    # ------------------------------------------------------------------
+    # Cloud Sync (optional)
+    # ------------------------------------------------------------------
+    sync_manager = None
+    if settings_repo.get("sync_enabled") == "true":
+        try:
+            from backend.sync.r2_client import R2Client
+            from backend.sync.sync_manager import SyncManager
+
+            r2_endpoint = settings_repo.get("r2_endpoint")
+            r2_bucket = settings_repo.get("r2_bucket")
+            r2_access_key = settings_repo.get_secret("r2_access_key_id")
+            r2_secret_key = settings_repo.get_secret("r2_secret_access_key")
+
+            if all([r2_endpoint, r2_bucket, r2_access_key, r2_secret_key]):
+                r2_client = R2Client(
+                    endpoint=r2_endpoint,
+                    access_key_id=r2_access_key,
+                    secret_access_key=r2_secret_key,
+                    bucket=r2_bucket,
+                )
+                sync_manager = SyncManager(
+                    r2_client=r2_client,
+                    document_repo=document_repo,
+                    collection_repo=collection_repo,
+                    tag_repo=tag_repo,
+                    chroma_store=chroma_store,
+                    settings_repo=settings_repo,
+                )
+                logger.info("Cloud Sync initialised")
+            else:
+                logger.info("Cloud Sync: missing R2 credentials, skipping")
+        except Exception as exc:
+            logger.warning("Cloud Sync init failed: %s", exc)
 
     # ------------------------------------------------------------------
     # Bridge API
@@ -188,6 +235,7 @@ def start_app() -> None:
         provider_manager=provider_manager,
         tag_repo=tag_repo,
         chroma_store=chroma_store,
+        sync_manager=sync_manager,
     )
 
     # ------------------------------------------------------------------
@@ -218,6 +266,22 @@ def start_app() -> None:
     )
 
     bridge.set_window(window)
+
+    # Start background sync pull
+    if sync_manager:
+        import threading
+
+        def _bg_sync():
+            try:
+                bridge._push_js("onSyncStart", {})
+                sync_manager.full_sync(
+                    on_complete=lambda data: bridge._push_js("onSyncComplete", data),
+                    on_error=lambda data: bridge._push_js("onSyncError", data),
+                )
+            except Exception as exc:
+                logger.warning("Background sync failed: %s", exc)
+
+        threading.Thread(target=_bg_sync, daemon=True).start()
 
     logger.info("Starting webview …")
     webview.start(debug=False)

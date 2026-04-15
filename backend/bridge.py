@@ -31,6 +31,7 @@ class BridgeAPI:
         provider_manager,
         tag_repo=None,
         chroma_store=None,
+        sync_manager=None,
     ) -> None:
         self._pipeline = pipeline
         self._query_engine = query_engine
@@ -41,6 +42,7 @@ class BridgeAPI:
         self._provider_manager = provider_manager
         self._tag_repo = tag_repo
         self._chroma_store = chroma_store
+        self._sync_manager = sync_manager
         self._window = None  # Set after window creation
 
     def set_window(self, window) -> None:
@@ -288,6 +290,13 @@ class BridgeAPI:
             except Exception as exc:
                 logger.warning("Failed to delete vectors for doc %s: %s", doc_id, exc)
         self._document_repo.delete(doc_id)
+        # Sync: push delete to R2
+        if self._sync_manager and self._settings_repo.get("sync_enabled") == "true":
+            threading.Thread(
+                target=self._sync_manager.push_delete,
+                args=(doc_id,),
+                daemon=True,
+            ).start()
         return {"success": True}
 
     def reindex_document(self, doc_id: int) -> dict:
@@ -314,6 +323,12 @@ class BridgeAPI:
     def move_document(self, doc_id: int, collection_id: int | None) -> dict:
         """Move a document to a different collection."""
         self._document_repo.move_to_collection(doc_id, collection_id)
+        if self._sync_manager and self._settings_repo.get("sync_enabled") == "true":
+            threading.Thread(
+                target=self._sync_manager.push_document,
+                args=(doc_id,),
+                daemon=True,
+            ).start()
         return {"success": True}
 
     # ------------------------------------------------------------------
@@ -415,12 +430,24 @@ class BridgeAPI:
         """Add a tag to a document (creates the tag if needed)."""
         if self._tag_repo:
             self._tag_repo.add_tag_to_document(doc_id, tag_name)
+        if self._sync_manager and self._settings_repo.get("sync_enabled") == "true":
+            threading.Thread(
+                target=self._sync_manager.push_document,
+                args=(doc_id,),
+                daemon=True,
+            ).start()
         return {"success": True}
 
     def remove_tag_from_document(self, doc_id: int, tag_id: int) -> dict:
         """Remove a tag from a document."""
         if self._tag_repo:
             self._tag_repo.remove_tag_from_document(doc_id, tag_id)
+        if self._sync_manager and self._settings_repo.get("sync_enabled") == "true":
+            threading.Thread(
+                target=self._sync_manager.push_document,
+                args=(doc_id,),
+                daemon=True,
+            ).start()
         return {"success": True}
 
     # ------------------------------------------------------------------
@@ -436,6 +463,43 @@ class BridgeAPI:
                 self.reindex_document(doc.id)
                 count += 1
         return {"count": count, "status": "reindexing"}
+
+    # ------------------------------------------------------------------
+    # Sync API
+    # ------------------------------------------------------------------
+
+    def get_sync_status(self) -> dict:
+        """Return current sync status."""
+        enabled = self._settings_repo.get("sync_enabled") == "true"
+        return {
+            "enabled": enabled,
+            "status": "disabled" if not enabled else "idle",
+        }
+
+    def test_sync_connection(self) -> dict:
+        """Test R2 connection."""
+        if not self._sync_manager:
+            return {"success": False, "error": "Sync not configured"}
+        try:
+            result = self._sync_manager._r2.test_connection()
+            return {"success": result}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    def trigger_sync(self) -> dict:
+        """Manually trigger full sync."""
+        if not self._sync_manager:
+            return {"error": "Sync not configured"}
+
+        def _run():
+            self._push_js("onSyncStart", {})
+            self._sync_manager.full_sync(
+                on_complete=lambda data: self._push_js("onSyncComplete", data),
+                on_error=lambda data: self._push_js("onSyncError", data),
+            )
+
+        threading.Thread(target=_run, daemon=True).start()
+        return {"status": "syncing"}
 
     # ------------------------------------------------------------------
     # Aliases for frontend compatibility

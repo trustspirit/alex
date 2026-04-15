@@ -27,6 +27,7 @@ class IngestionPipeline:
         settings_repo,
         on_progress: Callable | None = None,  # (doc_id, step, percent) -> None
         on_warning: Callable | None = None,   # (doc_id, warning) -> None
+        on_sync: Callable | None = None,      # (doc_id) -> None
     ) -> None:
         self._doc_repo = document_repo
         self._index_manager = index_manager
@@ -35,6 +36,7 @@ class IngestionPipeline:
         self._settings_repo = settings_repo
         self._on_progress = on_progress
         self._on_warning = on_warning
+        self._on_sync = on_sync
         self._chunker = Chunker()
         self._summarizer = Summarizer(llm=llm)
 
@@ -279,6 +281,13 @@ class IngestionPipeline:
             self._emit_progress(doc_id, "completed", 100, progress_cb)
             self._doc_repo.update_status(doc_id, "completed")
             logger.info("[doc %s] Step 5/5: COMPLETED successfully.", doc_id)
+
+            # Trigger sync push
+            if self._on_sync:
+                try:
+                    self._on_sync(doc_id)
+                except Exception as exc:
+                    logger.warning("[doc %s] Sync push failed: %s", doc_id, exc)
 
         except Exception as exc:
             logger.error("Async ingestion failed for doc %s: %s", doc_id, exc, exc_info=True)
