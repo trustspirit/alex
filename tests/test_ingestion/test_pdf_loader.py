@@ -78,11 +78,39 @@ def test_load_with_llamaparse_success():
 
 
 # ---------------------------------------------------------------------------
-# Tier-2: LlamaParse fails → OpenDataLoader
+# Tier-2: LlamaParse fails → MinerU
 # ---------------------------------------------------------------------------
 
+def test_load_falls_back_to_mineru():
+    mock_llama = _mock_llamacloud_fail()
+    with patch("backend.ingestion.loaders.pdf_loader._LlamaCloud", mock_llama), \
+         patch("backend.ingestion.loaders.pdf_loader.PdfLoader._load_mineru") as mock_mineru:
+        mock_mineru.return_value = [_make_doc("Page 1"), _make_doc("Page 2")]
+        loader = PdfLoader(llamaparse_api_key="test-key")
+        result = loader.load("dummy.pdf")
+    assert result.fallback_used is True
+    assert "MinerU" in result.fallback_warning
+    assert len(result.documents) == 2
+
+
+# ---------------------------------------------------------------------------
+# Tier-2 fails → Tier-3: MinerU fails → OpenDataLoader
+# ---------------------------------------------------------------------------
+
+def test_mineru_fallback_to_opendataloader():
+    mock_llama = _mock_llamacloud_fail()
+    mock_odl_docs = [_make_doc("ODL content")]
+    with patch("backend.ingestion.loaders.pdf_loader._LlamaCloud", mock_llama), \
+         patch("backend.ingestion.loaders.pdf_loader.PdfLoader._load_mineru", side_effect=Exception("MinerU failed")), \
+         patch("backend.ingestion.loaders.pdf_loader._try_opendataloader", return_value=mock_odl_docs):
+        loader = PdfLoader(llamaparse_api_key="test-key")
+        result = loader.load("dummy.pdf")
+    assert result.fallback_used is True
+    assert "OpenDataLoader" in result.fallback_warning
+
+
 def test_load_falls_back_to_opendataloader():
-    """LlamaParse raises → OpenDataLoader returns documents."""
+    """LlamaParse and MinerU both fail → OpenDataLoader returns documents."""
     mock_llama = _mock_llamacloud_fail()
     mock_odl_docs = [_make_doc("Content from OpenDataLoader")]
 
@@ -90,6 +118,7 @@ def test_load_falls_back_to_opendataloader():
         return mock_odl_docs
 
     with patch("backend.ingestion.loaders.pdf_loader._LlamaCloud", mock_llama), \
+         patch("backend.ingestion.loaders.pdf_loader.PdfLoader._load_mineru", side_effect=Exception("MinerU failed")), \
          patch("backend.ingestion.loaders.pdf_loader._try_opendataloader", side_effect=fake_try_opendataloader):
         loader = PdfLoader(llamaparse_api_key="test-key")
         result = loader.load("dummy.pdf")
@@ -100,53 +129,15 @@ def test_load_falls_back_to_opendataloader():
 
 
 # ---------------------------------------------------------------------------
-# Tier-3: LlamaParse fails + OpenDataLoader fails → LiteParse
-# ---------------------------------------------------------------------------
-
-def test_load_falls_back_to_liteparse():
-    """LlamaParse and OpenDataLoader both fail → LiteParse returns documents."""
-    mock_llama = _mock_llamacloud_fail()
-
-    def fail_opendataloader(file_path: str):
-        raise Exception("OpenDataLoader unavailable")
-
-    mock_page = MagicMock()
-    mock_page.text = "Fallback parsed content"
-    mock_parse_result = MagicMock()
-    mock_parse_result.num_pages = 1
-    mock_parse_result.get_page.return_value = mock_page
-
-    mock_liteparse_instance = MagicMock()
-    mock_liteparse_instance.parse.return_value = mock_parse_result
-    mock_liteparse_cls = MagicMock(return_value=mock_liteparse_instance)
-
-    with patch("backend.ingestion.loaders.pdf_loader._LlamaCloud", mock_llama), \
-         patch("backend.ingestion.loaders.pdf_loader._try_opendataloader", side_effect=fail_opendataloader), \
-         patch("backend.ingestion.loaders.pdf_loader._LiteParse", mock_liteparse_cls):
-        loader = PdfLoader(llamaparse_api_key="test-key")
-        result = loader.load("dummy.pdf")
-
-    assert result.fallback_used is True
-    assert "기본 파서" in result.fallback_warning
-    assert len(result.documents) == 1
-
-
-# ---------------------------------------------------------------------------
 # All fail → RuntimeError
 # ---------------------------------------------------------------------------
 
 def test_load_all_fail_raises():
     """All three tiers fail → RuntimeError is raised."""
     mock_llama = _mock_llamacloud_fail()
-
-    def fail_opendataloader(file_path: str):
-        raise Exception("OpenDataLoader unavailable")
-
-    mock_liteparse_cls = MagicMock(side_effect=Exception("LiteParse unavailable"))
-
     with patch("backend.ingestion.loaders.pdf_loader._LlamaCloud", mock_llama), \
-         patch("backend.ingestion.loaders.pdf_loader._try_opendataloader", side_effect=fail_opendataloader), \
-         patch("backend.ingestion.loaders.pdf_loader._LiteParse", mock_liteparse_cls):
+         patch("backend.ingestion.loaders.pdf_loader.PdfLoader._load_mineru", side_effect=Exception("MinerU failed")), \
+         patch("backend.ingestion.loaders.pdf_loader._try_opendataloader", side_effect=Exception("ODL failed")):
         loader = PdfLoader(llamaparse_api_key="test-key")
         with pytest.raises(RuntimeError):
             loader.load("dummy.pdf")
@@ -156,28 +147,15 @@ def test_load_all_fail_raises():
 # No API key → skip LlamaParse immediately
 # ---------------------------------------------------------------------------
 
-def test_no_api_key_skips_llamaparse():
-    """No API key → LlamaParse is skipped, falls through to next tier."""
-    mock_page = MagicMock()
-    mock_page.text = "LiteParse content"
-    mock_parse_result = MagicMock()
-    mock_parse_result.num_pages = 1
-    mock_parse_result.get_page.return_value = mock_page
-
-    mock_liteparse_instance = MagicMock()
-    mock_liteparse_instance.parse.return_value = mock_parse_result
-    mock_liteparse_cls = MagicMock(return_value=mock_liteparse_instance)
-
-    def fail_opendataloader(file_path: str):
-        raise Exception("No Java")
-
-    with patch("backend.ingestion.loaders.pdf_loader._try_opendataloader", side_effect=fail_opendataloader), \
-         patch("backend.ingestion.loaders.pdf_loader._LiteParse", mock_liteparse_cls):
-        loader = PdfLoader(llamaparse_api_key="")  # No key
+def test_no_api_key_skips_llamaparse_uses_mineru():
+    """No API key → LlamaParse is skipped, falls through to MinerU."""
+    with patch("backend.ingestion.loaders.pdf_loader.PdfLoader._load_mineru") as mock_mineru:
+        mock_mineru.return_value = [_make_doc("## Heading\nMinerU content")]
+        loader = PdfLoader(llamaparse_api_key="")
         result = loader.load("dummy.pdf")
-
     assert result.fallback_used is True
-    assert len(result.documents) == 1
+    assert "MinerU" in result.fallback_warning
+    assert result.has_structure is True
 
 
 # ---------------------------------------------------------------------------

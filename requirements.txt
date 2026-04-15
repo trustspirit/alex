@@ -11,7 +11,7 @@ llama-index-llms-gemini>=0.6.0
 llama-index-embeddings-openai>=0.6.0
 
 # Document Processing
-liteparse>=1.0.0
+magic-pdf[full]>=1.0.0
 opendataloader-pdf>=2.0.0
 yt-dlp>=2024.0.0
 youtube-transcript-api>=0.6.0
