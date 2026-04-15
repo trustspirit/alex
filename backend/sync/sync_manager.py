@@ -97,6 +97,9 @@ class SyncManager:
                 })
                 self._upload_manifest()
 
+            doc.sync_status = "synced"
+            doc.synced_at = datetime.now(timezone.utc)
+
             logger.info("push_document %s OK", doc_id)
 
         except Exception as exc:
@@ -201,8 +204,9 @@ class SyncManager:
                 except Exception as exc:
                     logger.warning("Pull delete failed for %s: %s", doc_id, exc)
 
-            self._manifest.clean_expired_tombstones(ttl_days=30)
-            self._upload_manifest()
+            with self._lock:
+                self._manifest.clean_expired_tombstones(ttl_days=30)
+                self._upload_manifest()
 
             logger.info("Pull complete: added=%d, deleted=%d", added, deleted)
 
@@ -223,15 +227,22 @@ class SyncManager:
     def full_sync(self, on_complete=None, on_error=None) -> None:
         """Full sync: pull then push unsynced local docs."""
         with self._lock:
-            self.pull(on_complete=None, on_error=on_error)
+            pull_result = {"added": 0, "deleted": 0}
 
+            def _capture_pull_result(data):
+                pull_result.update(data)
+
+            self.pull(on_complete=_capture_pull_result, on_error=on_error)
+
+            pushed = 0
             local_docs = self._doc_repo.list_all()
             for doc in local_docs:
                 if doc.status == "completed" and doc.synced_at is None:
                     self.push_document(doc.id)
+                    pushed += 1
 
             if on_complete:
-                on_complete({"added": 0, "deleted": 0})
+                on_complete({"added": pull_result["added"], "deleted": pull_result["deleted"], "pushed": pushed})
 
     def _upload_manifest(self) -> None:
         try:

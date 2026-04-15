@@ -35,7 +35,7 @@ def sync_manager(deps):
 def _make_doc(doc_id=1, title="test.pdf", source_type="pdf",
               source_path="/tmp/test.pdf", collection_id=None,
               token_count=100, fallback_used=False, fallback_warning=None,
-              sync_status="pending", synced_at=None):
+              sync_status="pending", synced_at=None, status="completed"):
     doc = MagicMock()
     doc.id = doc_id
     doc.title = title
@@ -47,6 +47,7 @@ def _make_doc(doc_id=1, title="test.pdf", source_type="pdf",
     doc.fallback_warning = fallback_warning
     doc.sync_status = sync_status
     doc.synced_at = synced_at
+    doc.status = status
     doc.tags = []
     return doc
 
@@ -98,8 +99,9 @@ def test_push_document_replaces_source_path(sync_manager, deps):
     assert upload_data["vectors"]["metadatas"][0]["source"] == "test.pdf"
 
 
-def test_push_document_updates_sync_status(sync_manager, deps):
+def test_push_document_sets_synced_at(sync_manager, deps):
     doc = _make_doc()
+    doc.synced_at = None
     deps["document_repo"].get_by_id.return_value = doc
     chroma_coll = MagicMock()
     chroma_coll.get.return_value = {
@@ -109,8 +111,8 @@ def test_push_document_updates_sync_status(sync_manager, deps):
 
     sync_manager.push_document(1)
 
-    deps["document_repo"].update_status.assert_not_called()
-    # sync_status update is done via set attribute or dedicated method
+    assert doc.synced_at is not None
+    assert doc.sync_status == "synced"
 
 
 def test_push_failure_records_pending(sync_manager, deps):
@@ -247,3 +249,77 @@ def test_pull_skips_failed_downloads(sync_manager, deps):
 
     # Only doc 2 should be created
     assert deps["document_repo"].create.call_count == 1
+
+
+# --- Full sync tests ---
+
+def test_full_sync_pull_then_push(sync_manager, deps):
+    """Verify pull is called, then unsynced docs are pushed."""
+    # Set up pull to be a no-op (no remote docs)
+    deps["r2_client"].list_objects.return_value = []
+    deps["r2_client"].download.side_effect = [
+        {"version": 1, "last_updated": "", "documents": {},
+         "collections": {}, "tombstones": {}},
+    ]
+
+    # First call to list_all is from pull, second from full_sync's push loop
+    unsynced_doc = _make_doc(doc_id=10, status="completed", synced_at=None)
+    already_synced_doc = _make_doc(doc_id=11, status="completed",
+                                   synced_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    pending_doc = _make_doc(doc_id=12, status="pending", synced_at=None)
+    deps["document_repo"].list_all.return_value = [unsynced_doc, already_synced_doc, pending_doc]
+    deps["document_repo"].get_by_id.return_value = unsynced_doc
+
+    chroma_coll = MagicMock()
+    chroma_coll.get.return_value = {
+        "ids": [], "embeddings": [], "metadatas": [], "documents": [],
+    }
+    deps["chroma_store"].get_or_create_collection.return_value = chroma_coll
+
+    result = {}
+
+    def capture(data):
+        result.update(data)
+
+    sync_manager.full_sync(on_complete=capture)
+
+    # Only the unsynced completed doc should be pushed
+    deps["document_repo"].get_by_id.assert_called_with(10)
+    assert result["pushed"] == 1
+
+
+def test_full_sync_captures_pull_counts(sync_manager, deps):
+    """Verify on_complete receives real pull counts, not zeros."""
+    deps["r2_client"].list_objects.return_value = ["documents/99.json.gz"]
+    deps["r2_client"].download.side_effect = [
+        # manifest
+        {"version": 1, "last_updated": "", "documents": {
+            "99": {"title": "remote.pdf", "source_type": "pdf",
+                   "synced_at": "2026-01-01T00:00:00Z"},
+        }, "collections": {}, "tombstones": {}},
+        # document payload
+        {"metadata": {
+            "id": "99", "title": "remote.pdf", "source_type": "pdf",
+            "source_path": "remote.pdf", "collection_name": None,
+            "tags": [], "token_count": 50,
+            "fallback_used": False, "fallback_warning": None,
+        }, "vectors": {
+            "ids": ["n1"], "embeddings": [[0.1]],
+            "metadatas": [{"source": "remote.pdf"}], "documents": ["text"],
+        }},
+    ]
+    deps["document_repo"].list_all.return_value = []
+
+    chroma_coll = MagicMock()
+    deps["chroma_store"].get_or_create_collection.return_value = chroma_coll
+
+    result = {}
+
+    def capture(data):
+        result.update(data)
+
+    sync_manager.full_sync(on_complete=capture)
+
+    assert result["added"] == 1
+    assert result["deleted"] == 0
+    assert result["pushed"] == 0
