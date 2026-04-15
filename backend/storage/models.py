@@ -49,6 +49,8 @@ class Document(Base):
     token_count = Column(Integer, default=0, nullable=False)
     fallback_used = Column(Boolean, default=False, nullable=False)
     fallback_warning = Column(Text, nullable=True)
+    sync_status = Column(String, default="pending")
+    synced_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
@@ -108,3 +110,20 @@ class Setting(Base):
     key = Column(String, unique=True, nullable=False)
     value = Column(Text, nullable=True)
     encrypted = Column(Boolean, default=False, nullable=False)
+
+
+class SyncState(Base):
+    __tablename__ = "sync_state"
+    id = Column(String, primary_key=True)
+    last_pull_at = Column(DateTime, nullable=True)
+    last_push_at = Column(DateTime, nullable=True)
+    r2_manifest_etag = Column(String, nullable=True)
+
+
+class PendingSync(Base):
+    __tablename__ = "pending_sync"
+    id = Column(String, primary_key=True)
+    doc_id = Column(String, nullable=False)
+    action = Column(String, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    retry_count = Column(Integer, default=0)

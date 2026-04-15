@@ -24,6 +24,7 @@ google-generativeai>=0.8.0
 # Storage
 sqlalchemy>=2.0.0
 keyring>=25.0.0
+boto3>=1.35.0
 
 # Utilities
 tiktoken>=0.7.0
