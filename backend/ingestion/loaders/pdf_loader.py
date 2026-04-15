@@ -144,11 +144,27 @@ class PdfLoader:
     # Private helpers
     # ------------------------------------------------------------------
 
+    _LLAMAPARSE_PAGE_LIMIT = 1000
+
     def _load_llamaparse(self, file_path: str) -> list:
         if _LlamaCloud is None:
             raise ImportError("llama-cloud SDK is not installed")
         if not self._llamaparse_api_key:
             raise ValueError("LlamaParse API key is not configured")
+
+        page_count = self._pdf_page_count(file_path)
+        if page_count > self._LLAMAPARSE_PAGE_LIMIT:
+            logger.info(
+                "PDF has %d pages (limit %d), splitting into chunks",
+                page_count,
+                self._LLAMAPARSE_PAGE_LIMIT,
+            )
+            return self._load_llamaparse_chunked(file_path, page_count)
+
+        return self._parse_single_pdf(file_path, page_offset=0)
+
+    def _parse_single_pdf(self, file_path: str, *, page_offset: int) -> list:
+        """Parse a single PDF file via LlamaParse and return Documents."""
         from backend.ingestion.loaders.document import Document
 
         client = _LlamaCloud(api_key=self._llamaparse_api_key)
@@ -172,13 +188,54 @@ class PdfLoader:
                         "source": file_path,
                         "type": "pdf",
                         "method": "llamaparse",
-                        "page_label": str(page.page_number),
+                        "page_label": str(page.page_number + page_offset),
                     },
                 ))
-
-        if not documents:
-            raise RuntimeError("LlamaParse returned empty result")
         return documents
+
+    def _load_llamaparse_chunked(self, file_path: str, page_count: int) -> list:
+        """Split a large PDF into chunks and parse each via LlamaParse."""
+        import tempfile
+        from pathlib import Path
+
+        import fitz  # PyMuPDF
+
+        chunk_size = self._LLAMAPARSE_PAGE_LIMIT
+        src = fitz.open(file_path)
+        all_documents = []
+
+        try:
+            for start in range(0, page_count, chunk_size):
+                end = min(start + chunk_size, page_count)
+                logger.info("Parsing pages %d–%d of %d", start + 1, end, page_count)
+
+                chunk_pdf = fitz.open()
+                chunk_pdf.insert_pdf(src, from_page=start, to_page=end - 1)
+
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                    chunk_pdf.save(tmp.name)
+                    chunk_pdf.close()
+                    tmp_path = tmp.name
+
+                try:
+                    docs = self._parse_single_pdf(tmp_path, page_offset=start)
+                    all_documents.extend(docs)
+                finally:
+                    Path(tmp_path).unlink(missing_ok=True)
+        finally:
+            src.close()
+
+        if not all_documents:
+            raise RuntimeError("LlamaParse returned empty result for all chunks")
+        return all_documents
+
+    @staticmethod
+    def _pdf_page_count(file_path: str) -> int:
+        """Return the number of pages in a PDF without fully parsing it."""
+        import fitz  # PyMuPDF
+
+        with fitz.open(file_path) as doc:
+            return len(doc)
 
     def _load_mineru(self, file_path: str) -> list:
         """Tier 2: MinerU local AI parser."""
@@ -217,8 +274,8 @@ class PdfLoader:
             content_list = None
             markdown = None
             try:
-                content_list = pipe_result.get_content_list()
-                markdown = pipe_result.get_markdown(image_dir="images")
+                content_list = pipe_result.get_content_list("images")
+                markdown = pipe_result.get_markdown("images")
             except AttributeError:
                 # File-based fallback
                 cl_files = list(Path(tmp_dir).glob("*_content_list*.json"))

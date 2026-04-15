@@ -66,7 +66,8 @@ def test_load_with_llamaparse_success():
     ])
 
     with patch("backend.ingestion.loaders.pdf_loader._LlamaCloud", mock_cls), \
-         patch("builtins.open", MagicMock()):
+         patch("builtins.open", MagicMock()), \
+         patch.object(PdfLoader, "_pdf_page_count", return_value=1):
         loader = PdfLoader(llamaparse_api_key="test-key")
         result = loader.load("dummy.pdf")
 
@@ -167,7 +168,8 @@ def test_detect_structure_with_headings():
     mock_cls = _mock_llamacloud([{"text": "# Title\nSome content"}])
 
     with patch("backend.ingestion.loaders.pdf_loader._LlamaCloud", mock_cls), \
-         patch("builtins.open", MagicMock()):
+         patch("builtins.open", MagicMock()), \
+         patch.object(PdfLoader, "_pdf_page_count", return_value=1):
         loader = PdfLoader(llamaparse_api_key="test-key")
         result = loader.load("dummy.pdf")
 
@@ -179,7 +181,8 @@ def test_detect_structure_without_headings():
     mock_cls = _mock_llamacloud([{"text": "Plain paragraph without headings."}])
 
     with patch("backend.ingestion.loaders.pdf_loader._LlamaCloud", mock_cls), \
-         patch("builtins.open", MagicMock()):
+         patch("builtins.open", MagicMock()), \
+         patch.object(PdfLoader, "_pdf_page_count", return_value=1):
         loader = PdfLoader(llamaparse_api_key="test-key")
         result = loader.load("dummy.pdf")
 
