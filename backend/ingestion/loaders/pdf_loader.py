@@ -152,12 +152,13 @@ class PdfLoader:
         from backend.ingestion.loaders.document import Document
 
         client = _LlamaCloud(api_key=self._llamaparse_api_key)
-        result = client.parsing.parse(
-            tier="agentic",
-            version="latest",
-            upload_file=open(file_path, "rb"),
-            expand=["markdown"],
-        )
+        with open(file_path, "rb") as f:
+            result = client.parsing.parse(
+                tier="agentic",
+                version="latest",
+                upload_file=f,
+                expand=["markdown"],
+            )
 
         documents = []
         if result.markdown and result.markdown.pages:

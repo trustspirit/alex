@@ -184,3 +184,61 @@ def test_detect_structure_without_headings():
         result = loader.load("dummy.pdf")
 
     assert result.has_structure is False
+
+
+# ---------------------------------------------------------------------------
+# _build_page_documents unit tests
+# ---------------------------------------------------------------------------
+
+def test_build_page_documents_with_page_idx():
+    """content_list with page_idx → page-level Documents."""
+    loader = PdfLoader()
+    content_list = [
+        {"page_idx": 0, "text": "First page content"},
+        {"page_idx": 0, "text": "More first page"},
+        {"page_idx": 1, "text": "Second page content"},
+    ]
+    docs = loader._build_page_documents(content_list, None, "test.pdf")
+    assert len(docs) == 2
+    assert "First page content" in docs[0].text
+    assert "More first page" in docs[0].text
+    assert docs[0].metadata["page_label"] == "1"
+    assert docs[1].metadata["page_label"] == "2"
+    assert docs[1].metadata["method"] == "mineru"
+
+
+def test_build_page_documents_markdown_fallback():
+    """No content_list → falls back to whole markdown."""
+    loader = PdfLoader()
+    docs = loader._build_page_documents(None, "# Title\nSome content", "test.pdf")
+    assert len(docs) == 1
+    assert "Title" in docs[0].text
+    assert docs[0].metadata["method"] == "mineru"
+
+
+def test_build_page_documents_empty():
+    """No content_list and no markdown → empty list."""
+    loader = PdfLoader()
+    docs = loader._build_page_documents(None, None, "test.pdf")
+    assert docs == []
+
+
+def test_build_page_documents_empty_content_list():
+    """Empty content_list → falls back to markdown."""
+    loader = PdfLoader()
+    docs = loader._build_page_documents([], "Fallback markdown", "test.pdf")
+    assert len(docs) == 1
+    assert "Fallback markdown" in docs[0].text
+
+
+def test_build_page_documents_skips_blank_text():
+    """Items with blank text are skipped."""
+    loader = PdfLoader()
+    content_list = [
+        {"page_idx": 0, "text": "Real content"},
+        {"page_idx": 0, "text": "   "},
+        {"page_idx": 1, "text": ""},
+    ]
+    docs = loader._build_page_documents(content_list, None, "test.pdf")
+    assert len(docs) == 1
+    assert docs[0].metadata["page_label"] == "1"
