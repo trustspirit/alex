@@ -103,6 +103,20 @@ class DocumentRepo(BaseRepo):
             doc.collection_id = collection_id
             self._session.commit()
 
+    def set_sync_status(self, doc_id: int, sync_status: str) -> Document | None:
+        """Update sync_status and synced_at after a successful sync push."""
+        from datetime import datetime, timezone
+
+        doc = self.get_by_id(doc_id)
+        if doc is None:
+            return None
+        doc.sync_status = sync_status
+        if sync_status == "synced":
+            doc.synced_at = datetime.now(timezone.utc)
+        self._session.commit()
+        self._session.refresh(doc)
+        return doc
+
     def delete(self, doc_id: int) -> None:
         doc = self.get_by_id(doc_id)
         if doc is not None:

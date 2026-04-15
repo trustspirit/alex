@@ -111,8 +111,7 @@ def test_push_document_sets_synced_at(sync_manager, deps):
 
     sync_manager.push_document(1)
 
-    assert doc.synced_at is not None
-    assert doc.sync_status == "synced"
+    deps["document_repo"].set_sync_status.assert_called_once_with(1, "synced")
 
 
 def test_push_failure_records_pending(sync_manager, deps):

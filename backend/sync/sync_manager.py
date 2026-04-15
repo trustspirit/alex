@@ -97,8 +97,7 @@ class SyncManager:
                 })
                 self._upload_manifest()
 
-            doc.sync_status = "synced"
-            doc.synced_at = datetime.now(timezone.utc)
+            self._doc_repo.set_sync_status(doc_id, "synced")
 
             logger.info("push_document %s OK", doc_id)
 
