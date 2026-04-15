@@ -198,8 +198,8 @@ def start_app() -> None:
 
             r2_endpoint = settings_repo.get("r2_endpoint")
             r2_bucket = settings_repo.get("r2_bucket")
-            r2_access_key = settings_repo.get_secret("r2_access_key_id")
-            r2_secret_key = settings_repo.get_secret("r2_secret_access_key")
+            r2_access_key = settings_repo.get_secret("r2_access_key_id_api_key")
+            r2_secret_key = settings_repo.get_secret("r2_secret_access_key_api_key")
 
             if all([r2_endpoint, r2_bucket, r2_access_key, r2_secret_key]):
                 r2_client = R2Client(

@@ -303,6 +303,8 @@ class SyncManager:
                 for tag_name in meta["tags"]:
                     self._tag_repo.add_tag_to_document(doc.id, tag_name)
 
+            self._doc_repo.set_sync_status(doc.id, "synced")
+
         except Exception:
             self._doc_repo.delete(doc.id)
             raise
