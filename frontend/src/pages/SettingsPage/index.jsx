@@ -2,6 +2,7 @@ import styled from 'styled-components';
 import { useSettings } from '../../hooks/useSettings';
 import ApiKeyForm from './ApiKeyForm';
 import ModelSelector from './ModelSelector';
+import SyncSettings from './SyncSettings';
 
 const PageWrapper = styled.div`
   min-height: 100%;
@@ -99,6 +100,7 @@ function SettingsPage() {
     loading,
     saving,
     saveApiKey,
+    saveSetting,
     selectDefaultProvider,
     selectDefaultModel,
     selectEmbedModel,
@@ -181,6 +183,11 @@ function SettingsPage() {
         {saving.system_prompt === 'saved' && (
           <SavedIndicator>Saved</SavedIndicator>
         )}
+      </Section>
+
+      <Section>
+        <SectionTitle>Cloud Sync</SectionTitle>
+        <SyncSettings settings={settings} onSaveSetting={saveSetting} onSaveApiKey={saveApiKey} />
       </Section>
     </PageWrapper>
   );

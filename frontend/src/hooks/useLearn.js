@@ -44,6 +44,13 @@ export function useLearn() {
   useEffect(() => {
     refreshDocuments();
     refreshCollections();
+
+    const handleSyncComplete = () => {
+      refreshDocuments();
+      refreshCollections();
+    };
+    window.addEventListener('alex-sync-complete', handleSyncComplete);
+    return () => window.removeEventListener('alex-sync-complete', handleSyncComplete);
   }, [refreshDocuments, refreshCollections]);
 
   // Refresh document list when a processing step changes or completes/fails

@@ -1,6 +1,7 @@
 import styled from 'styled-components';
 import { NavLink } from 'react-router-dom';
 import { useOnline } from '../hooks/useOnline';
+import { useSync } from '../hooks/useSync';
 
 const Wrapper = styled.div`
   display: flex;
@@ -70,6 +71,13 @@ const OfflineBadge = styled.div`
   text-align: center;
 `;
 
+const SyncBadge = styled.div`
+  font-size: 14px;
+  color: ${({ theme }) => theme.colors.textTertiary};
+  text-align: center;
+  cursor: default;
+`;
+
 // SVG icons
 const IconChat = () => (
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -95,6 +103,7 @@ const IconSettings = () => (
 
 function Layout({ children }) {
   const isOnline = useOnline();
+  const { syncStatus, lastSyncedAt } = useSync();
 
   return (
     <Wrapper>
@@ -110,6 +119,15 @@ function Layout({ children }) {
         </NavItem>
         <Spacer />
         {!isOnline && <OfflineBadge>Offline</OfflineBadge>}
+        {syncStatus !== 'disabled' && (
+          <SyncBadge title={
+            syncStatus === 'syncing' ? '\uB3D9\uAE30\uD654 \uC911...' :
+            syncStatus === 'error' ? 'Sync error' :
+            lastSyncedAt ? `Last synced: ${lastSyncedAt}` : 'Sync idle'
+          }>
+            {syncStatus === 'syncing' ? '\u27F3' : syncStatus === 'error' ? '\u26A0' : '\u2601'}
+          </SyncBadge>
+        )}
       </Sidebar>
       <Main>{children}</Main>
     </Wrapper>

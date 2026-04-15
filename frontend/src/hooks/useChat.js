@@ -203,6 +203,17 @@ export function useChat() {
     setSelectedCollectionId(collId);
   }, []);
 
+  // Refresh collections when sync completes
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      call('list_collections').then((cols) => {
+        if (cols) setCollections(cols);
+      });
+    };
+    window.addEventListener('alex-sync-complete', handleSyncComplete);
+    return () => window.removeEventListener('alex-sync-complete', handleSyncComplete);
+  }, [call]);
+
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e) {

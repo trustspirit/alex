@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useBridge } from '../../hooks/useBridge';
 import { formatRelativeDate } from '../../utils/formatDate';
@@ -318,7 +318,7 @@ function DocumentCard({ doc, docProgress, docWarnings, onDelete, onReindex, onTa
             </WarningIcon>
           )}
         </TitleRow>
-        {onReindex && (
+        {onReindex && !(doc.source_path && doc.source_path.startsWith('sync://')) && (
           <ReindexButton
             data-reindex
             title="Re-index document"

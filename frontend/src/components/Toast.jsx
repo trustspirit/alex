@@ -109,6 +109,18 @@ const CloseBtn = styled.button`
   }
 `;
 
+const ActionButton = styled.button`
+  background: none;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.sm};
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  padding: 2px 8px;
+  cursor: pointer;
+  margin-top: 4px;
+  &:hover { background: ${({ theme }) => theme.colors.surface}; }
+`;
+
 const AUTO_DISMISS_MS = 5000;
 
 function getTypeLabel(type) {
@@ -171,9 +183,10 @@ function ToastItem({ toast, onDismiss }) {
   }, [toast.id, onDismiss]);
 
   useEffect(() => {
+    if (toast.autoDismiss === false) return;
     const timer = setTimeout(dismiss, AUTO_DISMISS_MS);
     return () => clearTimeout(timer);
-  }, [dismiss]);
+  }, [dismiss, toast.autoDismiss]);
 
   return (
     <Item type={toast.type} exiting={exiting} onClick={dismiss}>
@@ -181,6 +194,15 @@ function ToastItem({ toast, onDismiss }) {
       <Body>
         <Title>{toast.title || getTypeLabel(toast.type)}</Title>
         {toast.message && <Message>{toast.message}</Message>}
+        {toast.action && (
+          <ActionButton onClick={(e) => {
+            e.stopPropagation();
+            if (toast.action.path) window.location.hash = toast.action.path;
+            onDismiss(toast.id);
+          }}>
+            {toast.action.label}
+          </ActionButton>
+        )}
       </Body>
       <CloseBtn onClick={(e) => { e.stopPropagation(); dismiss(); }}>
         <CloseIcon />
