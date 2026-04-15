@@ -158,13 +158,8 @@ def start_app() -> None:
     # Ingestion pipeline
     # ------------------------------------------------------------------
 
-    # Define sync callback (sync_manager may be set later, so use closure)
     from concurrent.futures import ThreadPoolExecutor
     _sync_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="sync-push")
-
-    def _on_sync(doc_id):
-        if sync_manager:
-            _sync_executor.submit(sync_manager.push_document, doc_id)
 
     pipeline = IngestionPipeline(
         document_repo=document_repo,
@@ -172,7 +167,6 @@ def start_app() -> None:
         llm=llm,
         embed_model=embed_model,
         settings_repo=settings_repo,
-        on_sync=_on_sync,
     )
 
     # ------------------------------------------------------------------
@@ -235,6 +229,14 @@ def start_app() -> None:
         chroma_store=chroma_store,
         sync_manager=sync_manager,
     )
+
+    # Set sync callback after bridge is created so it references
+    # bridge._sync_manager (which can be updated at runtime via initialize_sync)
+    def _on_sync(doc_id):
+        if bridge._sync_manager:
+            _sync_executor.submit(bridge._sync_manager.push_document, doc_id)
+
+    pipeline._on_sync = _on_sync
 
     # ------------------------------------------------------------------
     # Determine frontend URL

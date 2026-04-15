@@ -284,6 +284,7 @@ class BridgeAPI:
     def delete_document(self, doc_id: int) -> dict:
         """Delete a document record and its associated vectors from ChromaDB."""
         doc = self._document_repo.get_by_id(doc_id)
+        sync_id = doc.sync_id if doc else None
         if doc and self._chroma_store:
             try:
                 self._chroma_store.delete_documents_by_source("default", doc.source_path)
@@ -295,6 +296,7 @@ class BridgeAPI:
             threading.Thread(
                 target=self._sync_manager.push_delete,
                 args=(doc_id,),
+                kwargs={"sync_id": sync_id},
                 daemon=True,
             ).start()
         return {"success": True}
@@ -346,16 +348,22 @@ class BridgeAPI:
     def create_collection(self, name: str, description: str = "") -> dict:
         """Create a new collection and return its id and name."""
         coll = self._collection_repo.create(name=name, description=description)
+        if self._sync_manager and self._settings_repo.get("sync_enabled") == "true":
+            threading.Thread(target=self._sync_manager.push_manifest, daemon=True).start()
         return {"id": coll.id, "name": coll.name}
 
     def rename_collection(self, coll_id: int, new_name: str) -> dict:
         """Rename an existing collection."""
         self._collection_repo.rename(coll_id, new_name)
+        if self._sync_manager and self._settings_repo.get("sync_enabled") == "true":
+            threading.Thread(target=self._sync_manager.push_manifest, daemon=True).start()
         return {"success": True}
 
     def delete_collection(self, coll_id: int) -> dict:
         """Delete a collection."""
         self._collection_repo.delete(coll_id)
+        if self._sync_manager and self._settings_repo.get("sync_enabled") == "true":
+            threading.Thread(target=self._sync_manager.push_manifest, daemon=True).start()
         return {"success": True}
 
     # ------------------------------------------------------------------

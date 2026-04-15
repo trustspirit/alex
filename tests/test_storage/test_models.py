@@ -104,3 +104,4 @@ def test_document_sync_fields(tmp_db):
     tmp_db.commit()
     assert doc.sync_status == "pending"
     assert doc.synced_at is None
+    assert doc.sync_id is not None  # UUID auto-generated

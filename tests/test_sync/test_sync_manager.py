@@ -35,7 +35,8 @@ def sync_manager(deps):
 def _make_doc(doc_id=1, title="test.pdf", source_type="pdf",
               source_path="/tmp/test.pdf", collection_id=None,
               token_count=100, fallback_used=False, fallback_warning=None,
-              sync_status="pending", synced_at=None, status="completed"):
+              sync_status="pending", synced_at=None, status="completed",
+              sync_id=None):
     doc = MagicMock()
     doc.id = doc_id
     doc.title = title
@@ -49,6 +50,7 @@ def _make_doc(doc_id=1, title="test.pdf", source_type="pdf",
     doc.synced_at = synced_at
     doc.status = status
     doc.tags = []
+    doc.sync_id = sync_id
     return doc
 
 
@@ -63,7 +65,7 @@ def _make_collection(coll_id=1, name="Research", description="Papers"):
 # --- Push tests ---
 
 def test_push_document_uploads_to_r2(sync_manager, deps):
-    doc = _make_doc()
+    doc = _make_doc(sync_id="aaa-bbb-ccc")
     deps["document_repo"].get_by_id.return_value = doc
     chroma_coll = MagicMock()
     chroma_coll.get.return_value = {
@@ -77,11 +79,11 @@ def test_push_document_uploads_to_r2(sync_manager, deps):
     # upload called twice: once for document, once for manifest
     assert deps["r2_client"].upload.call_count == 2
     key = deps["r2_client"].upload.call_args_list[0][0][0]
-    assert key == "documents/1.json.gz"
+    assert key == "documents/aaa-bbb-ccc.json.gz"
 
 
 def test_push_document_replaces_source_path(sync_manager, deps):
-    doc = _make_doc(source_path="/Users/me/Documents/test.pdf")
+    doc = _make_doc(source_path="/Users/me/Documents/test.pdf", sync_id="sid-123")
     deps["document_repo"].get_by_id.return_value = doc
     chroma_coll = MagicMock()
     chroma_coll.get.return_value = {
@@ -100,7 +102,7 @@ def test_push_document_replaces_source_path(sync_manager, deps):
 
 
 def test_push_document_sets_synced_at(sync_manager, deps):
-    doc = _make_doc()
+    doc = _make_doc(sync_id="sid-456")
     doc.synced_at = None
     deps["document_repo"].get_by_id.return_value = doc
     chroma_coll = MagicMock()
@@ -115,7 +117,7 @@ def test_push_document_sets_synced_at(sync_manager, deps):
 
 
 def test_push_failure_records_pending(sync_manager, deps):
-    doc = _make_doc()
+    doc = _make_doc(sync_id="sid-789")
     deps["document_repo"].get_by_id.return_value = doc
     chroma_coll = MagicMock()
     chroma_coll.get.return_value = {
@@ -131,12 +133,12 @@ def test_push_failure_records_pending(sync_manager, deps):
 # --- Delete tests ---
 
 def test_push_delete_removes_from_r2(sync_manager, deps):
-    sync_manager.push_delete(1)
-    deps["r2_client"].delete.assert_called_with("documents/1.json.gz")
+    sync_manager.push_delete(1, sync_id="sid-del")
+    deps["r2_client"].delete.assert_called_with("documents/sid-del.json.gz")
 
 
 def test_push_delete_adds_tombstone(sync_manager, deps):
-    sync_manager.push_delete(1)
+    sync_manager.push_delete(1, sync_id="sid-tomb")
     deps["r2_client"].upload.assert_called()  # manifest upload
     key = deps["r2_client"].upload.call_args[0][0]
     assert key == "manifest.json"
@@ -179,12 +181,12 @@ def test_pull_downloads_new_documents(sync_manager, deps):
 
 
 def test_pull_applies_tombstones(sync_manager, deps):
-    local_doc = _make_doc(doc_id=5, sync_status="synced")
+    local_doc = _make_doc(doc_id=5, sync_status="synced", sync_id="sid-5")
     deps["r2_client"].list_objects.return_value = []
     deps["r2_client"].download.side_effect = [
         {"version": 1, "last_updated": "", "documents": {},
          "collections": {}, "tombstones": {
-            "5": {"deleted_at": "2026-01-01T00:00:00Z"},
+            "sid-5": {"deleted_at": "2026-01-01T00:00:00Z"},
         }},
     ]
     deps["document_repo"].list_all.return_value = [local_doc]
@@ -262,10 +264,11 @@ def test_full_sync_pull_then_push(sync_manager, deps):
     ]
 
     # First call to list_all is from pull, second from full_sync's push loop
-    unsynced_doc = _make_doc(doc_id=10, status="completed", synced_at=None)
+    unsynced_doc = _make_doc(doc_id=10, status="completed", synced_at=None, sync_id=None)
     already_synced_doc = _make_doc(doc_id=11, status="completed",
-                                   synced_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
-    pending_doc = _make_doc(doc_id=12, status="pending", synced_at=None)
+                                   synced_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                                   sync_id="sid-11")
+    pending_doc = _make_doc(doc_id=12, status="pending", synced_at=None, sync_id=None)
     deps["document_repo"].list_all.return_value = [unsynced_doc, already_synced_doc, pending_doc]
     deps["document_repo"].get_by_id.return_value = unsynced_doc
 

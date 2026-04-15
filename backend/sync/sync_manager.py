@@ -46,6 +46,12 @@ class SyncManager:
                 logger.warning("push_document: doc %s not found", doc_id)
                 return
 
+            # Ensure sync_id exists
+            if not doc.sync_id:
+                import uuid
+                doc.sync_id = str(uuid.uuid4())
+                # The session will persist this on next commit
+
             chroma_coll = self._chroma.get_or_create_collection("default")
             vectors = chroma_coll.get(
                 where={"source": doc.source_path},
@@ -69,8 +75,22 @@ class SyncManager:
 
             tags = [t.name for t in (doc.tags or [])]
 
+            # Strip local sync prefix from vector IDs for R2 storage
+            original_ids = []
+            for vid in vectors.get("ids", []):
+                # Remove sync_{id}_ prefix if present
+                if vid.startswith("sync_"):
+                    parts = vid.split("_", 2)
+                    if len(parts) >= 3:
+                        original_ids.append(parts[2])
+                    else:
+                        original_ids.append(vid)
+                else:
+                    original_ids.append(vid)
+
             payload = {
                 "metadata": {
+                    "sync_id": doc.sync_id,
                     "id": str(doc.id),
                     "title": doc.title,
                     "source_type": doc.source_type,
@@ -82,51 +102,51 @@ class SyncManager:
                     "fallback_warning": doc.fallback_warning,
                 },
                 "vectors": {
-                    "ids": vectors.get("ids", []),
+                    "ids": original_ids,
                     "embeddings": vectors.get("embeddings", []),
                     "metadatas": normalized_metadatas,
                     "documents": vectors.get("documents", []),
                 },
             }
 
-            key = f"{DOCUMENTS_PREFIX}{doc_id}.json.gz"
+            key = f"{DOCUMENTS_PREFIX}{doc.sync_id}.json.gz"
             self._r2.upload(key, payload)
 
             if not self._batch_mode:
                 with self._lock:
-                    self._manifest.add_document(str(doc_id), {
+                    self._manifest.add_document(doc.sync_id, {
                         "title": doc.title,
                         "source_type": doc.source_type,
                     })
                     self._upload_manifest()
             else:
                 with self._lock:
-                    self._manifest.add_document(str(doc_id), {
+                    self._manifest.add_document(doc.sync_id, {
                         "title": doc.title,
                         "source_type": doc.source_type,
                     })
 
             self._doc_repo.set_sync_status(doc_id, "synced")
 
-            logger.info("push_document %s OK", doc_id)
+            logger.info("push_document %s OK (sync_id=%s)", doc_id, doc.sync_id)
 
         except Exception as exc:
             logger.warning("push_document %s FAILED: %s", doc_id, exc)
 
-    def push_delete(self, doc_id: int) -> None:
+    def push_delete(self, doc_id: int, sync_id: str = None) -> None:
         """Push a delete tombstone to R2."""
         try:
-            key = f"{DOCUMENTS_PREFIX}{doc_id}.json.gz"
+            key = f"{DOCUMENTS_PREFIX}{sync_id or doc_id}.json.gz"
             try:
                 self._r2.delete(key)
             except Exception as exc:
                 logger.warning("Could not delete %s from R2: %s", key, exc)
 
             with self._lock:
-                self._manifest.add_tombstone(str(doc_id))
+                self._manifest.add_tombstone(str(sync_id or doc_id))
                 self._upload_manifest()
 
-            logger.info("push_delete %s OK", doc_id)
+            logger.info("push_delete %s OK (sync_id=%s)", doc_id, sync_id)
 
         except Exception as exc:
             logger.warning("push_delete %s FAILED: %s", doc_id, exc)
@@ -162,13 +182,13 @@ class SyncManager:
                 self._manifest = Manifest()
 
             local_docs = self._doc_repo.list_all()
-            local_doc_ids = {str(d.id) for d in local_docs}
-            local_synced_ids = {str(d.id) for d in local_docs if d.synced_at is not None}
+            local_sync_ids = {d.sync_id for d in local_docs if d.sync_id}
+            local_synced_sync_ids = {d.sync_id for d in local_docs if d.sync_id and d.synced_at is not None}
 
-            diff = self._manifest.diff(local_doc_ids, local_synced_ids)
+            diff = self._manifest.diff(local_sync_ids, local_synced_sync_ids)
 
             for rid in remote_doc_ids:
-                if rid not in local_doc_ids and rid not in self._manifest.tombstones:
+                if rid not in local_sync_ids and rid not in self._manifest.tombstones:
                     diff.to_download.add(rid)
 
             self._sync_collections()
@@ -198,19 +218,25 @@ class SyncManager:
                     logger.warning("Pull insert failed for %s: %s", doc_id, exc)
 
             deleted = 0
-            for doc_id in diff.to_delete_locally:
+            for sync_id in diff.to_delete_locally:
                 try:
-                    int_id = int(doc_id)
-                    doc = self._doc_repo.get_by_id(int_id)
-                    if doc and self._chroma:
+                    # Find local doc by sync_id
+                    doc = None
+                    for d in local_docs:
+                        if d.sync_id == sync_id:
+                            doc = d
+                            break
+                    if not doc:
+                        continue
+                    if self._chroma:
                         try:
                             self._chroma.delete_documents_by_source("default", doc.source_path)
                         except Exception:
                             pass
-                    self._doc_repo.delete(int_id)
+                    self._doc_repo.delete(doc.id)
                     deleted += 1
                 except Exception as exc:
-                    logger.warning("Pull delete failed for %s: %s", doc_id, exc)
+                    logger.warning("Pull delete failed for %s: %s", sync_id, exc)
 
             with self._lock:
                 self._manifest.clean_expired_tombstones(ttl_days=30)
@@ -317,6 +343,8 @@ class SyncManager:
             collection_id=collection_id,
             token_count=meta.get("token_count", 0),
         )
+        # Set sync_id to match the R2 key (doc_id here is the sync_id from R2)
+        doc.sync_id = doc_id
 
         try:
             if vectors.get("ids"):
@@ -340,9 +368,9 @@ class SyncManager:
                 for tag_name in meta["tags"]:
                     self._tag_repo.add_tag_to_document(doc.id, tag_name)
 
-            # Register in manifest so other devices see this device has the doc
+            # Register in manifest using sync_id so other devices see this device has the doc
             with self._lock:
-                self._manifest.add_document(str(doc.id), {
+                self._manifest.add_document(doc_id, {
                     "title": meta["title"],
                     "source_type": meta["source_type"],
                 })

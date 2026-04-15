@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
@@ -51,6 +52,7 @@ class Document(Base):
     fallback_warning = Column(Text, nullable=True)
     sync_status = Column(String, default="pending")
     synced_at = Column(DateTime, nullable=True)
+    sync_id = Column(String, default=lambda: str(uuid.uuid4()), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
